@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nova avaliacao</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
+  <link rel="stylesheet" href="/css/app.css" />
+</head>
+<body>
+  <div id="app">
+    <div class="boot-loading loader-block">
+      <div class="spinner"></div>
+      <p>A preparar o portal...</p>
+    </div>
+    <div id="app-content" class="aval-page" hidden>
+      <div class="dash-topbar fade-in">
+        <h2><i class="bi bi-clipboard2-check"></i> Acompanhamento de execucao</h2>
+        <div id="pilar-picker"></div>
+      </div>
+
+      <div id="aval-empty" class="no-data compact">
+        <i class="bi bi-hourglass-split"></i>
+        <p>A carregar projecto...</p>
+      </div>
+
+      <form id="avaliacao-form" class="aval-form fade-in delay-1" hidden>
+        <section class="aval-summary" id="project-summary"></section>
+
+        <section class="aval-block">
+          <header class="aval-block-head">
+            <div>
+              <h3>Execucao de actividades</h3>
+              <p>Actualize apenas a % de conclusao. Estado e datas sao calculados automaticamente.</p>
+            </div>
+            <div class="aval-progress-chip" id="global-progress-chip">
+              <span>Progresso global</span>
+              <strong id="global_progress_label">0%</strong>
+              <div class="progress-bar-wrap compact"><div class="progress-bar" id="global_progress_bar" style="width:0%"></div></div>
+            </div>
+          </header>
+          <div id="execution_list" class="aval-table-wrap"></div>
+        </section>
+
+        <section class="aval-block">
+          <header class="aval-block-head">
+            <div>
+              <h3>Execucao orcamental</h3>
+              <p>Montante executado e cumulativo. A validacao do minimo ocorre ao submeter.</p>
+            </div>
+          </header>
+          <div class="budget-summary">
+            <div class="budget-card planned"><span>Planeado</span><strong id="sum_planned">0</strong></div>
+            <div class="budget-card executed"><span>Executado</span><strong id="sum_executed">0</strong></div>
+            <div class="budget-card pct"><span>% Execucao</span><strong id="sum_pct">0%</strong></div>
+          </div>
+          <div class="progress-bar-wrap" style="margin:0 0 14px"><div class="progress-bar" id="budget_progress" style="width:0%"></div></div>
+          <div class="table-wrap">
+            <table class="aval-table" id="budget_table">
+              <thead>
+                <tr>
+                  <th>Rubrica</th>
+                  <th>Planeado</th>
+                  <th>Executado (cumulativo)</th>
+                  <th>%</th>
+                </tr>
+              </thead>
+              <tbody id="budget_rows"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="aval-block">
+          <header class="aval-block-head">
+            <div>
+              <h3>Proximos passos</h3>
+              <p>Passos em aberto acumulam entre avaliacoes. Marque como concluido os ja executados.</p>
+            </div>
+            <button type="button" class="btn btn-outline compact" id="btn-add-passo">
+              <i class="bi bi-plus-lg"></i> Adicionar
+            </button>
+          </header>
+          <div id="next_steps_list"></div>
+        </section>
+
+        <section class="aval-block">
+          <header class="aval-block-head">
+            <div>
+              <h3>Riscos do periodo</h3>
+              <p>Consulte probabilidade e impacto; registe observacoes deste periodo.</p>
+            </div>
+          </header>
+          <div id="risks_list" class="risk-list"></div>
+        </section>
+
+        <section class="aval-block">
+          <header class="aval-block-head">
+            <div>
+              <h3>Anexos</h3>
+              <p>Carregue documentos de suporte deste periodo (PDF, Office, imagens — max. 12 MB cada).</p>
+            </div>
+            <label class="btn btn-outline compact aval-file-btn">
+              <i class="bi bi-paperclip"></i> Adicionar ficheiros
+              <input type="file" id="anexo_input" multiple hidden
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg,.gif,.webp,.txt,.csv,.zip" />
+            </label>
+          </header>
+          <div id="anexos_pending" class="anexo-pending-list">
+            <p class="empty-hint">Nenhum ficheiro seleccionado.</p>
+          </div>
+        </section>
+
+        <div class="submit-bar sticky-submit">
+          <button type="submit" class="btn btn-primary" id="btn_submit">
+            <i class="bi bi-send"></i> Submeter avaliacao
+          </button>
+          <a href="/avaliacoes" class="btn btn-outline"><i class="bi bi-archive"></i> Arquivo</a>
+        </div>
+      </form>
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  <script type="module" src="/js/pages/avaliacao.js"></script>
+</body>
+</html>

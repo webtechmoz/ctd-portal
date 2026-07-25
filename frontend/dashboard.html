@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Resultados</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+  <link rel="stylesheet" href="/css/app.css" />
+</head>
+<body>
+  <div id="app">
+    <div class="boot-loading loader-block">
+      <div class="spinner"></div>
+      <p>A preparar o portal...</p>
+    </div>
+    <div id="app-content" hidden>
+      <div class="dash-topbar fade-in">
+        <h2><i class="bi bi-speedometer2"></i> Resultados por pilar</h2>
+        <div id="pilar-picker"></div>
+      </div>
+      <div id="dash-content" class="fade-in delay-1"></div>
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script type="module" src="/js/pages/dashboard.js"></script>
+</body>
+</html>

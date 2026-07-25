@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GAPI — Login</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+  <link rel="stylesheet" href="/css/app.css" />
+</head>
+<body class="login-body">
+  <div class="login-container">
+    <div class="login-card">
+      <div class="login-brand">
+        <img src="/assets/logo.png" alt="GAPI" />
+        <div>
+          <strong style="color:var(--green-dark)">CTD · GAPI</strong>
+          <div style="font-size:0.78rem;color:var(--muted)">Comissao de Transformacao Digital</div>
+        </div>
+      </div>
+      <h2>Bem-vindo</h2>
+      <p class="subtitle">Inicie sessao para aceder a plataforma</p>
+      <div id="error_box" class="error-box" role="alert">
+        <i class="bi bi-exclamation-triangle"></i>
+        <span id="error_msg"></span>
+      </div>
+      <form id="login-form" autocomplete="on">
+        <div class="form-group">
+          <label for="email">Email institucional</label>
+          <div class="input-wrap">
+            <i class="bi bi-envelope icon"></i>
+            <input id="email" name="email" type="email" required autocomplete="email" placeholder="utilizador@gapi.co.mz" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="password">Palavra-passe</label>
+          <div class="input-wrap">
+            <i class="bi bi-key icon"></i>
+            <input id="password" name="password" type="password" required autocomplete="current-password" placeholder="••••••••" />
+            <button type="button" class="toggle-pw" id="toggle_pw" aria-label="Mostrar password">
+              <i class="bi bi-eye"></i>
+            </button>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block" id="btn_login">
+          <i class="bi bi-box-arrow-in-right"></i> Entrar
+        </button>
+      </form>
+    </div>
+  </div>
+  <script type="module" src="/js/pages/login.js"></script>
+</body>
+</html>

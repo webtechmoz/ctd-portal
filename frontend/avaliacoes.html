@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Arquivo de avaliacoes</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+  <link rel="stylesheet" href="/css/app.css" />
+</head>
+<body>
+  <div id="app">
+    <div class="boot-loading loader-block">
+      <div class="spinner"></div>
+      <p>A preparar o portal...</p>
+    </div>
+    <div id="app-content" hidden>
+      <section class="home-hero fade-in">
+        <div>
+          <h2>Arquivo de avaliacoes</h2>
+          <p>Consulte o acompanhamento de execucao submetido em cada periodo.</p>
+        </div>
+        <a class="btn btn-primary" href="/avaliacao"><i class="bi bi-plus-lg"></i> Nova avaliacao</a>
+      </section>
+
+      <section class="panel fade-in delay-1">
+        <div class="panel-head">
+          <h3><i class="bi bi-archive"></i> Historico</h3>
+          <div class="arquivo-filters">
+            <label class="filter-inline">
+              Projecto
+              <select id="filter-pilar">
+                <option value="">Todos</option>
+              </select>
+            </label>
+          </div>
+        </div>
+        <div id="arquivo-controls"></div>
+        <div id="arquivo-list" class="arquivo-list">
+          <div class="no-data compact"><i class="bi bi-hourglass-split"></i><p>A carregar...</p></div>
+        </div>
+      </section>
+
+      <section class="panel fade-in" id="arquivo-detail" hidden>
+        <div class="panel-head">
+          <h3 id="detail-title">Detalhe</h3>
+          <button type="button" class="btn btn-outline compact" id="btn-close-detail">Fechar</button>
+        </div>
+        <div id="detail-body"></div>
+      </section>
+    </div>
+  </div>
+  <script type="module" src="/js/pages/avaliacoes.js"></script>
+</body>
+</html>
