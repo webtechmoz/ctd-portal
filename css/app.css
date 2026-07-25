@@ -630,17 +630,19 @@ textarea {
 
 .styled-select {
   position: relative;
-  display: inline-flex;
-  align-items: center;
-  min-width: 120px;
+  display: block;
+  width: 100%;
+  min-width: 0;
   max-width: 100%;
   vertical-align: middle;
-  height: 36px;
+  height: auto;
 }
 
 .styled-select-trigger {
   width: 100%;
-  height: 36px;
+  box-sizing: border-box;
+  min-height: 36px;
+  height: auto;
   display: inline-flex;
   align-items: center;
   justify-content: space-between;
@@ -663,19 +665,23 @@ textarea {
 .styled-select-value {
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
+  flex: 1;
+  text-align: left;
 }
 
 .styled-select-menu {
   position: absolute;
   top: calc(100% + 4px);
   left: 0;
-  min-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
   z-index: 90;
   background: #fff;
   border-radius: 10px;
   box-shadow: 0 10px 24px rgba(20, 50, 20, 0.14);
   padding: 4px;
-  max-height: 180px;
+  max-height: 200px;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -689,6 +695,7 @@ body > .styled-select-menu {
 
 .styled-select-option {
   width: 100%;
+  box-sizing: border-box;
   border: none;
   background: transparent;
   text-align: left;
@@ -697,6 +704,8 @@ body > .styled-select-menu {
   cursor: pointer;
   font-size: 0.85rem;
   color: var(--text);
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .styled-select-option:hover,
@@ -709,7 +718,8 @@ body > .styled-select-menu {
 }
 
 .data-table .styled-select {
-  min-width: 130px;
+  min-width: 0;
+  width: 100%;
 }
 
 /* Data tables (admin / arquivo) */
@@ -2972,11 +2982,12 @@ body.modal-open {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px 16px;
+  padding: 16px;
   overflow-x: hidden;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
+  box-sizing: border-box;
 }
 
 .modal-backdrop[hidden] {
@@ -2984,8 +2995,9 @@ body.modal-open {
 }
 
 .modal-card {
-  width: min(840px, 100%);
-  max-height: min(92vh, 920px);
+  width: min(480px, calc(100vw - 32px));
+  max-width: calc(100vw - 32px);
+  max-height: min(90vh, 860px);
   background: #fff;
   border-radius: 16px;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.2);
@@ -2993,11 +3005,13 @@ body.modal-open {
   margin: auto;
   display: flex;
   flex-direction: column;
+  box-sizing: border-box;
+  overflow: hidden;
   animation: fadeUp 0.22s ease;
 }
 
 .modal-card.wide {
-  width: min(960px, 100%);
+  width: min(640px, calc(100vw - 32px));
 }
 
 .modal-head {
@@ -3311,12 +3325,28 @@ a.btn-primary {
 .field .styled-select,
 .field .styled-select-trigger {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   height: auto;
   min-height: 42px;
   background: #f4f8f2;
   box-shadow: inset 0 0 0 1.5px rgba(58, 125, 44, 0.14);
   border-radius: 10px;
   font-weight: 500;
+  box-sizing: border-box;
+}
+
+.modal-body .field-grid {
+  grid-template-columns: 1fr 1fr;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 520px) {
+  .modal-body .field-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .chip-row {

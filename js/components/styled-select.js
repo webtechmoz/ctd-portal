@@ -1,4 +1,4 @@
-/** Replace native <select> look with a styled dropdown (keeps a hidden native select in sync). */
+/** Replace native <select> with a styled dropdown (hidden native select stays in sync). */
 
 function escapeHtml(str) {
   return String(str ?? "")
@@ -16,8 +16,34 @@ function closeAllMenus(except) {
     if (m) {
       m.hidden = true;
       if (m.parentNode !== el) el.appendChild(m);
+      clearMenuInline(m);
     }
   });
+}
+
+function clearMenuInline(menu) {
+  [
+    "position",
+    "top",
+    "bottom",
+    "left",
+    "right",
+    "width",
+    "minWidth",
+    "maxWidth",
+    "maxHeight",
+    "zIndex",
+    "overflowY",
+    "overscrollBehavior",
+    "boxSizing",
+  ].forEach((k) => {
+    menu.style[k] = "";
+  });
+}
+
+/** Close every open styled-select (e.g. when a dialog closes). */
+export function closeStyledSelects() {
+  closeAllMenus(null);
 }
 
 /**
@@ -38,10 +64,11 @@ export function enhanceSelect(select, opts = {}) {
   const trigger = document.createElement("button");
   trigger.type = "button";
   trigger.className = "styled-select-trigger";
-  trigger.innerHTML = `<span class="styled-select-value"></span><i class="bi bi-chevron-down"></i>`;
+  trigger.innerHTML = `<span class="styled-select-value"></span><i class="bi bi-chevron-down" aria-hidden="true"></i>`;
   const menu = document.createElement("div");
   menu.className = "styled-select-menu";
   menu.hidden = true;
+  menu.tabIndex = -1;
   menu.setAttribute("role", "listbox");
   wrap.appendChild(trigger);
   wrap.appendChild(menu);
@@ -60,69 +87,82 @@ export function enhanceSelect(select, opts = {}) {
     menu.innerHTML = [...select.options]
       .map(
         (o) => `
-      <button type="button" class="styled-select-option ${o.selected ? "active" : ""}" data-value="${escapeHtml(o.value)}" ${o.disabled ? "disabled" : ""} role="option" aria-selected="${o.selected ? "true" : "false"}">
+      <button type="button" class="styled-select-option ${o.selected ? "active" : ""}" data-value="${escapeHtml(o.value)}" ${o.disabled ? "disabled" : ""} role="option" aria-selected="${o.selected ? "true" : "false"}" tabindex="-1">
         ${escapeHtml(o.textContent)}
       </button>`
       )
       .join("");
-    highlightIndex = optionButtons().findIndex((b) => b.classList.contains("active"));
+    const opts = optionButtons();
+    highlightIndex = opts.findIndex((b) => b.classList.contains("active"));
+    if (highlightIndex < 0) highlightIndex = opts.length ? 0 : -1;
   }
 
   function setHighlight(index) {
     const opts = optionButtons();
     if (!opts.length) return;
-    highlightIndex = Math.max(0, Math.min(index, opts.length - 1));
-    opts.forEach((b, i) => b.classList.toggle("active", i === highlightIndex));
+    highlightIndex = ((index % opts.length) + opts.length) % opts.length;
+    opts.forEach((b, i) => {
+      const on = i === highlightIndex;
+      b.classList.toggle("active", on);
+      b.setAttribute("aria-selected", on ? "true" : "false");
+    });
     opts[highlightIndex]?.scrollIntoView({ block: "nearest" });
   }
 
   function positionMenu() {
     const rect = trigger.getBoundingClientRect();
-    const maxH = 180;
-    const spaceBelow = window.innerHeight - rect.bottom - 12;
-    const spaceAbove = rect.top - 12;
-    const openUp = spaceBelow < 140 && spaceAbove > spaceBelow;
-    const avail = Math.max(100, openUp ? spaceAbove : spaceBelow);
+    const width = Math.max(0, rect.width);
+    const maxH = 200;
+    const gap = 4;
+    const pad = 8;
+    const spaceBelow = window.innerHeight - rect.bottom - pad;
+    const spaceAbove = rect.top - pad;
+    const openUp = spaceBelow < 120 && spaceAbove > spaceBelow;
+    const avail = Math.max(96, openUp ? spaceAbove : spaceBelow);
+
+    let left = rect.left;
+    if (left + width > window.innerWidth - pad) {
+      left = Math.max(pad, window.innerWidth - pad - width);
+    }
+    if (left < pad) left = pad;
+
     menu.style.position = "fixed";
-    menu.style.left = `${Math.max(8, Math.min(rect.left, window.innerWidth - Math.max(rect.width, 160) - 8))}px`;
-    menu.style.width = `${Math.max(rect.width, 140)}px`;
+    menu.style.boxSizing = "border-box";
+    menu.style.left = `${left}px`;
+    menu.style.width = `${width}px`;
+    menu.style.minWidth = `${width}px`;
+    menu.style.maxWidth = `${width}px`;
     menu.style.maxHeight = `${Math.min(maxH, avail)}px`;
     menu.style.zIndex = "600";
     menu.style.overflowY = "auto";
     menu.style.overscrollBehavior = "contain";
     if (openUp) {
       menu.style.top = "auto";
-      menu.style.bottom = `${window.innerHeight - rect.top + 4}px`;
+      menu.style.bottom = `${window.innerHeight - rect.top + gap}px`;
     } else {
       menu.style.bottom = "auto";
-      menu.style.top = `${rect.bottom + 4}px`;
+      menu.style.top = `${rect.bottom + gap}px`;
     }
   }
 
   function close() {
+    if (menu.hidden) return;
     menu.hidden = true;
     wrap.classList.remove("open");
     trigger.setAttribute("aria-expanded", "false");
     if (menu.parentNode !== wrap) wrap.appendChild(menu);
-    menu.style.position = "";
-    menu.style.top = "";
-    menu.style.bottom = "";
-    menu.style.left = "";
-    menu.style.width = "";
-    menu.style.maxHeight = "";
-    menu.style.zIndex = "";
-    menu.style.overflowY = "";
-    menu.style.overscrollBehavior = "";
+    clearMenuInline(menu);
   }
 
   function open() {
     closeAllMenus(wrap);
+    paint();
     document.body.appendChild(menu);
     menu.hidden = false;
     wrap.classList.add("open");
     trigger.setAttribute("aria-expanded", "true");
     positionMenu();
-    setHighlight(Math.max(0, highlightIndex));
+    setHighlight(highlightIndex < 0 ? 0 : highlightIndex);
   }
 
   function pickValue(value) {
@@ -131,6 +171,11 @@ export function enhanceSelect(select, opts = {}) {
     paint();
     close();
     trigger.focus();
+  }
+
+  function pickHighlighted() {
+    const opts = optionButtons();
+    if (opts[highlightIndex]) pickValue(opts[highlightIndex].dataset.value);
   }
 
   trigger.setAttribute("aria-haspopup", "listbox");
@@ -143,41 +188,57 @@ export function enhanceSelect(select, opts = {}) {
     else close();
   });
 
+  // Focus stays on the trigger — handle keys here while open
   trigger.addEventListener("keydown", (e) => {
-    if (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ") {
+    const openKeys = ["ArrowDown", "ArrowUp", "Enter", " "];
+    if (menu.hidden) {
+      if (openKeys.includes(e.key)) {
+        e.preventDefault();
+        e.stopPropagation();
+        open();
+        if (e.key === "ArrowUp") setHighlight(optionButtons().length - 1);
+      }
+      return;
+    }
+
+    if (e.key === "ArrowDown") {
       e.preventDefault();
-      if (menu.hidden) open();
-      else if (e.key === "ArrowDown") setHighlight(highlightIndex + 1);
+      e.stopPropagation();
+      setHighlight(highlightIndex + 1);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      e.stopPropagation();
+      setHighlight(highlightIndex - 1);
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      e.stopPropagation();
+      pickHighlighted();
+    } else if (e.key === " ") {
+      e.preventDefault();
+      e.stopPropagation();
+      pickHighlighted();
     } else if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopPropagation();
+      close();
+    } else if (e.key === "Tab") {
       close();
     }
+  });
+
+  menu.addEventListener("mousedown", (e) => {
+    // Prevent trigger blur/outside-click races before click fires
+    e.preventDefault();
   });
 
   menu.addEventListener("click", (e) => {
     const btn = e.target.closest(".styled-select-option");
     if (!btn || btn.disabled) return;
+    e.preventDefault();
+    e.stopPropagation();
     pickValue(btn.dataset.value);
   });
 
-  menu.addEventListener("keydown", (e) => {
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      setHighlight(highlightIndex + 1);
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      setHighlight(highlightIndex - 1);
-    } else if (e.key === "Enter") {
-      e.preventDefault();
-      const opts = optionButtons();
-      if (opts[highlightIndex]) pickValue(opts[highlightIndex].dataset.value);
-    } else if (e.key === "Escape") {
-      e.preventDefault();
-      close();
-      trigger.focus();
-    }
-  });
-
-  // Keep wheel/scroll inside the menu — do not bubble to page/modal
   menu.addEventListener(
     "wheel",
     (e) => {
@@ -192,8 +253,6 @@ export function enhanceSelect(select, opts = {}) {
     close();
   });
 
-  // Close only when something *outside* the menu scrolls (page / modal body).
-  // Scrolling the options list must keep the menu open.
   window.addEventListener(
     "scroll",
     (e) => {
