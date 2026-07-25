@@ -676,12 +676,15 @@ textarea {
   box-shadow: 0 10px 24px rgba(20, 50, 20, 0.14);
   padding: 4px;
   max-height: 220px;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 body > .styled-select-menu {
   position: fixed;
-  z-index: 500;
+  z-index: 600;
 }
 
 .styled-select-option {
@@ -2969,8 +2972,11 @@ body.modal-open {
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  padding: 40px 16px;
+  padding: 24px 16px;
+  overflow-x: hidden;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
 
 .modal-backdrop[hidden] {
@@ -2979,11 +2985,14 @@ body.modal-open {
 
 .modal-card {
   width: min(720px, 100%);
+  max-height: calc(100vh - 48px);
   background: #fff;
   border-radius: 16px;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.2);
   padding: 0;
-  margin: auto;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
   animation: fadeUp 0.22s ease;
 }
 
@@ -2998,6 +3007,7 @@ body.modal-open {
   gap: 12px;
   padding: 16px 20px;
   border-bottom: 1px solid rgba(58, 125, 44, 0.1);
+  flex-shrink: 0;
 }
 
 .modal-head h3 {
@@ -3008,9 +3018,13 @@ body.modal-open {
 
 .modal-body {
   padding: 18px 20px;
-  max-height: min(78vh, 720px);
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
   overflow-y: auto;
   overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .modal-body-spaced {
@@ -3171,14 +3185,14 @@ body.modal-open {
 .page-form-actions {
   position: sticky;
   bottom: 12px;
-  z-index: 10;
+  z-index: 20;
   display: flex;
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
   gap: 12px;
   padding: 14px 16px;
-  background: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.96);
   backdrop-filter: blur(10px);
   border: 1px solid rgba(58, 125, 44, 0.14);
   border-radius: 14px;
@@ -3209,6 +3223,9 @@ a.btn-primary {
   gap: 10px;
   padding: 14px 20px 18px;
   border-top: 1px solid rgba(58, 125, 44, 0.1);
+  flex-shrink: 0;
+  background: #fff;
+  border-radius: 0 0 16px 16px;
 }
 
 .modal-foot-split {
