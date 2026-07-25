@@ -78,14 +78,14 @@ export function enhanceSelect(select, opts = {}) {
 
   function positionMenu() {
     const rect = trigger.getBoundingClientRect();
-    const maxH = 220;
-    const spaceBelow = window.innerHeight - rect.bottom - 8;
-    const spaceAbove = rect.top - 8;
-    const openUp = spaceBelow < Math.min(maxH, 140) && spaceAbove > spaceBelow;
-    const avail = Math.max(120, openUp ? spaceAbove : spaceBelow);
+    const maxH = 180;
+    const spaceBelow = window.innerHeight - rect.bottom - 12;
+    const spaceAbove = rect.top - 12;
+    const openUp = spaceBelow < 140 && spaceAbove > spaceBelow;
+    const avail = Math.max(100, openUp ? spaceAbove : spaceBelow);
     menu.style.position = "fixed";
-    menu.style.left = `${Math.max(8, Math.min(rect.left, window.innerWidth - rect.width - 8))}px`;
-    menu.style.width = `${Math.max(rect.width, 120)}px`;
+    menu.style.left = `${Math.max(8, Math.min(rect.left, window.innerWidth - Math.max(rect.width, 160) - 8))}px`;
+    menu.style.width = `${Math.max(rect.width, 140)}px`;
     menu.style.maxHeight = `${Math.min(maxH, avail)}px`;
     menu.style.zIndex = "600";
     menu.style.overflowY = "auto";

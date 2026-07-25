@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any
 
 import pyweber as pw
@@ -10,6 +11,8 @@ from pyweber.models.response import Response
 from pyweber.utils.types import ContentTypes
 
 from app.schemas.errors import error_body
+
+logger = logging.getLogger("ctd.api")
 
 
 def api_route(app: pw.Pyweber, path: str, methods: list[str] | None = None, **kwargs):
@@ -40,7 +43,6 @@ def api_json(app: pw.Pyweber, data: Any, status: int = 200) -> Response:
     return resp
 
 
-
 def api_error(
     app: pw.Pyweber,
     status: int,
@@ -48,4 +50,12 @@ def api_error(
     message: str,
     details: list[Any] | None = None,
 ) -> Response:
+    path = app.request.path if app.request else "?"
+    method = getattr(app.request, "method", "?") if app.request else "?"
+    if status >= 500:
+        logger.error("%s %s [%s] %s", method, path, code, message)
+    else:
+        logger.warning("%s %s [%s] %s", method, path, code, message)
+    if details:
+        logger.warning("details: %s", details)
     return api_json(app, error_body(code, message, details), status=status)

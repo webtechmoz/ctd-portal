@@ -103,6 +103,10 @@ def bootstrap_database(*, force: bool = False) -> Engine:
         eng = init_engine()
         if settings.AUTO_MIGRATE:
             run_migrations()
+        # Alembic fileConfig pode ter alterado handlers — repor logs da app
+        from app.logging_config import configure_logging
+
+        configure_logging(force=True)
         settings.validate_for_boot()
         try:
             from app.services.seed_service import run_seed

@@ -17,9 +17,9 @@ config.set_main_option(
     settings.sqlalchemy_database_url.replace("%", "%%"),
 )
 
-
+# Nao desactivar loggers da app (uvicorn/ctd) — o default do fileConfig engolia INFO.
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 target_metadata = Base.metadata
 
