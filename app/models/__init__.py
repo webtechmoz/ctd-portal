@@ -10,6 +10,7 @@ from app.models.avaliacao import (
 )
 from app.models.enums import (
     ActividadeEstado,
+    ActividadeStatus,
     Impacto,
     PilarStatus,
     Prioridade,
@@ -51,6 +52,7 @@ __all__ = [
     "Probabilidade",
     "Impacto",
     "ActividadeEstado",
+    "ActividadeStatus",
     "Avaliacao",
     "AvaliacaoActividade",
     "AvaliacaoOrcamento",

@@ -7,7 +7,7 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models.enums import Impacto, PilarStatus, Prioridade, Probabilidade
+from app.models.enums import ActividadeStatus, Impacto, PilarStatus, Prioridade, Probabilidade
 from app.schemas.pilar import PilarDetail
 
 
@@ -28,6 +28,7 @@ class ActividadeOut(BaseModel):
     data_fim_prevista: date | None = None
     descricao: str | None = None
     obs_planeamento: str | None = None
+    status: ActividadeStatus = ActividadeStatus.activa
     ordem: int
 
 

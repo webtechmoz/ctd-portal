@@ -50,6 +50,57 @@ function formatMoney(value) {
   return n.toLocaleString("pt-MZ", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function fmtDateShort(iso) {
+  if (!iso) return "";
+  const raw = String(iso).slice(0, 10);
+  const [y, m, d] = raw.split("-");
+  if (!y || !m || !d) return raw;
+  return `${d}/${m}/${y}`;
+}
+
+function actMeta(a) {
+  const parts = [a.responsavel || "—", a.prioridade || "media"];
+  const ini = fmtDateShort(a.data_inicio_prevista);
+  const fim = fmtDateShort(a.data_fim_prevista);
+  if (ini || fim) parts.push(`${ini || "?"} → ${fim || "?"}`);
+  if (a.status === "cancelada") parts.push("Cancelada");
+  return parts.join(" · ");
+}
+
+function fillActForm(item = null) {
+  document.getElementById("act_nome").value = item?.nome || "";
+  document.getElementById("act_resp").value = item?.responsavel || "";
+  document.getElementById("act_prio").value = item?.prioridade || "media";
+  document.getElementById("act_inicio").value = item?.data_inicio_prevista || "";
+  document.getElementById("act_fim").value = item?.data_fim_prevista || "";
+  document.getElementById("act_cancelada").checked = item?.status === "cancelada";
+  reEnhance(document.getElementById("act_prio"));
+  bindDatePicker(document.getElementById("act_inicio"), {
+    defaultDate: item?.data_inicio_prevista || null,
+  });
+  bindDatePicker(document.getElementById("act_fim"), {
+    defaultDate: item?.data_fim_prevista || null,
+  });
+}
+
+function readActForm() {
+  const nome = document.getElementById("act_nome").value.trim();
+  const inicio = document.getElementById("act_inicio").value || null;
+  const fim = document.getElementById("act_fim").value || null;
+  if (inicio && fim && fim < inicio) {
+    toast("A data de fim previsto nao pode ser anterior ao inicio.", "error");
+    return null;
+  }
+  return {
+    nome,
+    responsavel: document.getElementById("act_resp").value.trim(),
+    prioridade: document.getElementById("act_prio").value,
+    data_inicio_prevista: inicio,
+    data_fim_prevista: fim,
+    status: document.getElementById("act_cancelada").checked ? "cancelada" : "activa",
+  };
+}
+
 function reEnhance(select) {
   if (!select) return;
   if (select.dataset.enhanced === "1") {
@@ -72,13 +123,15 @@ let catalogData = { categories: {}, options: {} };
 let draft = emptyDraft();
 let proxPicker = null;
 /** @type {{ kind: 'existing' | 'pending', id?: number, index?: number } | null} */
+let editAct = null;
+/** @type {{ kind: 'existing' | 'pending', id?: number, index?: number } | null} */
 let editOrc = null;
 /** @type {{ kind: 'existing' | 'pending', id?: number, index?: number } | null} */
 let editRisco = null;
 
 function emptyDraft(pilar = null) {
   return {
-    existingActs: [...(pilar?.actividades || [])],
+    existingActs: [...(pilar?.actividades || [])].map((a) => ({ ...a })),
     existingOrcs: [...(pilar?.orcamento_categorias || [])].map((o) => ({ ...o })),
     existingRiscos: [...(pilar?.riscos || [])].map((r) => ({ ...r })),
     pendingActs: [],
@@ -87,6 +140,7 @@ function emptyDraft(pilar = null) {
     deleteActs: new Set(),
     deleteOrcs: new Set(),
     deleteRiscos: new Set(),
+    dirtyActs: new Set(),
     dirtyOrcs: new Set(),
     dirtyRiscos: new Set(),
   };
@@ -128,25 +182,47 @@ function syncOrcTotal() {
 }
 
 function paintChips() {
-  const actEl = document.getElementById("p_act_chips");
+  const actEl = document.getElementById("p_act_list");
   const orcEl = document.getElementById("p_orc_list");
   const riscoEl = document.getElementById("p_risco_list");
 
-  actEl.innerHTML = [
+  const actRows = [
     ...draft.existingActs.map((a) => {
       const del = draft.deleteActs.has(a.id);
-      return `<span class="chip ${del ? "muted" : ""}" data-kind="act" data-id="${a.id}">
-        <span>${escapeHtml(a.nome)}</span>
-        <button type="button" title="${del ? "Restaurar" : "Remover"}"><i class="bi ${del ? "bi-arrow-counterclockwise" : "bi-x"}"></i></button>
-      </span>`;
+      const cancelled = a.status === "cancelada";
+      return `<li class="nested-item ${del ? "is-removed" : ""} ${cancelled && !del ? "is-cancelled" : ""}" data-kind="act" data-id="${a.id}">
+        <div class="nested-item-body">
+          <strong>${escapeHtml(a.nome)}</strong>
+          <span class="nested-item-meta">${escapeHtml(actMeta(a))}</span>
+        </div>
+        <div class="nested-item-actions">
+          ${
+            del
+              ? ""
+              : `<button type="button" class="nested-item-btn" data-action="edit" title="Editar"><i class="bi bi-pencil"></i></button>`
+          }
+          <button type="button" class="nested-item-btn" data-action="toggle" title="${del ? "Restaurar" : "Remover"}">
+            <i class="bi ${del ? "bi-arrow-counterclockwise" : "bi-trash"}"></i>
+          </button>
+        </div>
+      </li>`;
     }),
     ...draft.pendingActs.map(
-      (a, i) => `<span class="chip" data-kind="act-new" data-i="${i}">
-        <span>+ ${escapeHtml(a.nome)}</span>
-        <button type="button"><i class="bi bi-x"></i></button>
-      </span>`
+      (a, i) => `<li class="nested-item is-new ${a.status === "cancelada" ? "is-cancelled" : ""}" data-kind="act-new" data-i="${i}">
+        <div class="nested-item-body">
+          <strong>${escapeHtml(a.nome)}</strong>
+          <span class="nested-item-meta">${escapeHtml(actMeta(a))}</span>
+        </div>
+        <div class="nested-item-actions">
+          <button type="button" class="nested-item-btn" data-action="edit" title="Editar"><i class="bi bi-pencil"></i></button>
+          <button type="button" class="nested-item-btn" data-action="remove" title="Remover"><i class="bi bi-trash"></i></button>
+        </div>
+      </li>`
     ),
-  ].join("") || `<p class="empty-chips">Nenhuma actividade ainda.</p>`;
+  ];
+  actEl.innerHTML = actRows.length
+    ? `<ul class="nested-item-list">${actRows.join("")}</ul>`
+    : `<p class="empty-chips">Nenhuma actividade ainda.</p>`;
 
   const orcRows = [
     ...draft.existingOrcs.map((o) => {
@@ -229,21 +305,13 @@ function paintChips() {
   syncOrcTotal();
 }
 
-function bindActChipClicks() {
-  document.getElementById("p_act_chips")?.addEventListener("click", (e) => {
-    const btn = e.target.closest("button");
-    const chip = e.target.closest(".chip");
-    if (!btn || !chip) return;
-    const kind = chip.dataset.kind;
-    if (kind === "act") {
-      const id = Number(chip.dataset.id);
-      if (draft.deleteActs.has(id)) draft.deleteActs.delete(id);
-      else draft.deleteActs.add(id);
-    } else if (kind === "act-new") draft.pendingActs.splice(Number(chip.dataset.i), 1);
-    paintChips();
-  });
+function openActModal(mode) {
+  editAct = mode;
+  const isEdit = Boolean(mode);
+  document.getElementById("modal-act-title").textContent = isEdit ? "Editar actividade" : "Nova actividade";
+  document.getElementById("btn-confirm-act").textContent = isEdit ? "Guardar" : "Adicionar";
+  openModal(document.getElementById("modal-act"));
 }
-bindActChipClicks();
 
 function openOrcModal(mode) {
   editOrc = mode;
@@ -268,6 +336,34 @@ function bindNestedList(rootId) {
     if (!btn || !row) return;
     const action = btn.dataset.action;
     const kind = row.dataset.kind;
+
+    if (kind === "act" || kind === "act-new") {
+      if (action === "edit") {
+        if (kind === "act") {
+          const id = Number(row.dataset.id);
+          const item = draft.existingActs.find((a) => a.id === id);
+          if (!item || draft.deleteActs.has(id)) return;
+          fillActForm(item);
+          openActModal({ kind: "existing", id });
+        } else {
+          const index = Number(row.dataset.i);
+          const item = draft.pendingActs[index];
+          if (!item) return;
+          fillActForm(item);
+          openActModal({ kind: "pending", index });
+        }
+        return;
+      }
+      if (action === "toggle" && kind === "act") {
+        const id = Number(row.dataset.id);
+        if (draft.deleteActs.has(id)) draft.deleteActs.delete(id);
+        else draft.deleteActs.add(id);
+      } else if (action === "remove" && kind === "act-new") {
+        draft.pendingActs.splice(Number(row.dataset.i), 1);
+      }
+      paintChips();
+      return;
+    }
 
     if (kind === "orc" || kind === "orc-new") {
       if (action === "edit") {
@@ -337,6 +433,7 @@ function bindNestedList(rootId) {
     }
   });
 }
+bindNestedList("p_act_list");
 bindNestedList("p_orc_list");
 bindNestedList("p_risco_list");
 
@@ -349,6 +446,7 @@ function syncProximaFromPeriod() {
 
 function fillForm(pilar) {
   draft = emptyDraft(pilar);
+  editAct = null;
   editOrc = null;
   editRisco = null;
   document.getElementById("p_edit_id").value = pilar?.id || "";
@@ -438,20 +536,26 @@ document.getElementById("btn-delete-pilar")?.addEventListener("click", async () 
 });
 
 document.getElementById("btn-add-act")?.addEventListener("click", () => {
-  document.getElementById("act_nome").value = "";
-  document.getElementById("act_resp").value = "";
-  document.getElementById("act_prio").value = "media";
-  reEnhance(document.getElementById("act_prio"));
-  openModal(document.getElementById("modal-act"));
+  fillActForm(null);
+  openActModal(null);
 });
 document.getElementById("btn-confirm-act")?.addEventListener("click", () => {
-  const nome = document.getElementById("act_nome").value.trim();
-  if (!nome) return toast("Indique o nome da actividade.", "error");
-  draft.pendingActs.push({
-    nome,
-    responsavel: document.getElementById("act_resp").value.trim(),
-    prioridade: document.getElementById("act_prio").value,
-  });
+  const payload = readActForm();
+  if (!payload) return;
+  if (!payload.nome) return toast("Indique o nome da actividade.", "error");
+  if (editAct?.kind === "existing") {
+    const item = draft.existingActs.find((a) => a.id === editAct.id);
+    if (item) {
+      Object.assign(item, payload);
+      draft.dirtyActs.add(item.id);
+    }
+  } else if (editAct?.kind === "pending") {
+    const item = draft.pendingActs[editAct.index];
+    if (item) Object.assign(item, payload);
+  } else {
+    draft.pendingActs.push(payload);
+  }
+  editAct = null;
   closeModal(document.getElementById("modal-act"));
   paintChips();
 });
@@ -544,7 +648,21 @@ document.getElementById("pilar-form")?.addEventListener("submit", async (e) => {
     kpis: document.getElementById("p_kpis").value,
     beneficios: document.getElementById("p_benef").value,
   };
-  if (draft.pendingActs.length) base.actividades = draft.pendingActs;
+  const actPayload = [
+    ...draft.existingActs
+      .filter((a) => !draft.deleteActs.has(a.id) && draft.dirtyActs.has(a.id))
+      .map((a) => ({
+        id: a.id,
+        nome: a.nome,
+        responsavel: a.responsavel || "",
+        prioridade: a.prioridade || "media",
+        data_inicio_prevista: a.data_inicio_prevista || null,
+        data_fim_prevista: a.data_fim_prevista || null,
+        status: a.status || "activa",
+      })),
+    ...draft.pendingActs,
+  ];
+  if (actPayload.length) base.actividades = actPayload;
 
   const orcPayload = [
     ...draft.existingOrcs

@@ -15,7 +15,7 @@ from app.models.avaliacao import (
     AvaliacaoProximoPasso,
     AvaliacaoRisco,
 )
-from app.models.enums import ActividadeEstado, UserRole
+from app.models.enums import ActividadeEstado, ActividadeStatus, UserRole
 from app.models.pilar import Pilar, PilarProximoPasso, PilarResponsavel
 from app.models.user import User
 from app.repositories import avaliacoes as aval_repo
@@ -65,7 +65,14 @@ def create_avaliacao(session: Session, user: User, payload: AvaliacaoCreate) -> 
     }
     prev_orc = {o.categoria_id: o for o in (previous.orcamentos if previous else [])}
 
-    act_ids = {a.id for a in pilar.actividades}
+    act_by_id = {a.id: a for a in pilar.actividades}
+    act_ids = set(act_by_id)
+    cancelled_ids = {
+        a.id
+        for a in pilar.actividades
+        if (a.status.value if hasattr(a.status, "value") else str(a.status))
+        == ActividadeStatus.cancelada.value
+    }
     cat_ids = {c.id for c in pilar.orcamento_categorias}
     risco_ids = {r.id for r in pilar.riscos}
     passo_ids = {p.id for p in pilar.proximos_passos}
@@ -75,6 +82,12 @@ def create_avaliacao(session: Session, user: User, payload: AvaliacaoCreate) -> 
             raise auth_service.AuthError(
                 "VALIDATION_ERROR",
                 f"Actividade {row.pilar_actividade_id} nao pertence ao pilar.",
+                422,
+            )
+        if row.pilar_actividade_id in cancelled_ids:
+            raise auth_service.AuthError(
+                "VALIDATION_ERROR",
+                f"Actividade «{act_by_id[row.pilar_actividade_id].nome}» esta cancelada e nao pode receber dados.",
                 422,
             )
         prev = prev_act.get(row.pilar_actividade_id)
@@ -141,9 +154,12 @@ def create_avaliacao(session: Session, user: User, payload: AvaliacaoCreate) -> 
         session.flush()
         resolved_passos.append((novo.id, row.alcancado, row.observacao))
 
-    # Progresso = media simples das % das actividades (ou payload se nao houver)
-    if payload.actividades:
-        progresso = sum(a.pct_conclusao for a in payload.actividades) / len(payload.actividades)
+    # Progresso = media das % das actividades activas (canceladas excluidas)
+    active_rows = [
+        a for a in payload.actividades if a.pilar_actividade_id not in cancelled_ids
+    ]
+    if active_rows:
+        progresso = sum(a.pct_conclusao for a in active_rows) / len(active_rows)
     else:
         progresso = float(payload.progresso or 0)
 

@@ -6,7 +6,7 @@ from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
-from app.models.enums import ActividadeEstado, Impacto, Probabilidade
+from app.models.enums import ActividadeEstado, ActividadeStatus, Impacto, Probabilidade
 from app.models.pilar import Pilar
 from app.repositories import avaliacoes as avaliacao_repo
 from app.repositories import pilares as pilar_repo
@@ -48,6 +48,11 @@ def build_dashboard(session: Session, pilar_id: int) -> DashboardResponse:
     concluidas = em_prog = pendentes = 0
     for row in latest.actividades:
         base = act_by_id.get(row.pilar_actividade_id)
+        if base and (
+            (base.status.value if hasattr(base.status, "value") else str(base.status))
+            == ActividadeStatus.cancelada.value
+        ):
+            continue
         estado = row.estado.value if hasattr(row.estado, "value") else str(row.estado)
         if estado == ActividadeEstado.concluida.value:
             concluidas += 1

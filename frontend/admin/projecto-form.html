@@ -96,7 +96,7 @@
             </div>
           </header>
           <div class="nested-block nested-block-flush">
-            <div id="p_act_chips" class="chip-row"></div>
+            <div id="p_act_list" class="nested-items"></div>
             <div class="nested-actions">
               <button type="button" class="btn btn-outline compact" id="btn-add-act"><i class="bi bi-plus-lg"></i> Adicionar actividade</button>
             </div>
@@ -153,7 +153,7 @@
   <div class="modal-backdrop" id="modal-act" hidden>
     <div class="modal-card" role="dialog">
       <div class="modal-head">
-        <h3>Nova actividade</h3>
+        <h3 id="modal-act-title">Nova actividade</h3>
         <button type="button" class="modal-close" data-close-modal><i class="bi bi-x-lg"></i></button>
       </div>
       <div class="modal-body">
@@ -166,6 +166,12 @@
               <option value="media" selected>media</option>
               <option value="baixa">baixa</option>
             </select>
+          </label>
+          <label class="field"><span>Inicio previsto</span><input id="act_inicio" type="text" placeholder="dd/mm/aaaa" /></label>
+          <label class="field"><span>Fim previsto</span><input id="act_fim" type="text" placeholder="dd/mm/aaaa" /></label>
+          <label class="field full check-field">
+            <input type="checkbox" id="act_cancelada" />
+            <span>Marcar como cancelada (nao conta para execucao global)</span>
           </label>
         </div>
       </div>

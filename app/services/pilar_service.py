@@ -53,6 +53,7 @@ def _set_nested_create(pilar: Pilar, data: PilarWrite) -> None:
                 data_fim_prevista=row.data_fim_prevista,
                 descricao=row.descricao,
                 obs_planeamento=row.obs_planeamento,
+                status=row.status,
                 ordem=row.ordem if row.ordem else i,
             )
         )
@@ -103,6 +104,20 @@ def _append_nested(pilar: Pilar, data: PilarUpdate) -> None:
         )
     base_act = len(pilar.actividades)
     for i, row in enumerate(data.actividades or []):
+        if row.id:
+            act = next((a for a in pilar.actividades if a.id == row.id), None)
+            if act:
+                act.nome = row.nome
+                act.responsavel = row.responsavel or ""
+                act.prioridade = row.prioridade
+                act.data_inicio_prevista = row.data_inicio_prevista
+                act.data_fim_prevista = row.data_fim_prevista
+                act.descricao = row.descricao
+                act.obs_planeamento = row.obs_planeamento
+                act.status = row.status
+                if row.ordem:
+                    act.ordem = row.ordem
+                continue
         pilar.actividades.append(
             PilarActividade(
                 nome=row.nome,
@@ -112,7 +127,8 @@ def _append_nested(pilar: Pilar, data: PilarUpdate) -> None:
                 data_fim_prevista=row.data_fim_prevista,
                 descricao=row.descricao,
                 obs_planeamento=row.obs_planeamento,
-                ordem=base_act + i,
+                status=row.status,
+                ordem=row.ordem if row.ordem else base_act + i,
             )
         )
     base_orc = len(pilar.orcamento_categorias)

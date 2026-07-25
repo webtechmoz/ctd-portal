@@ -56,10 +56,29 @@ function estadoBadge(estado) {
     pendente: "neutro",
     em_progresso: "warn",
     concluida: "ok",
+    cancelada: "cancel",
   };
   const label =
-    estado === "em_progresso" ? "Em progresso" : estado === "concluida" ? "Concluida" : "Pendente";
+    estado === "em_progresso"
+      ? "Em progresso"
+      : estado === "concluida"
+        ? "Concluida"
+        : estado === "cancelada"
+          ? "Cancelada"
+          : "Pendente";
   return `<span class="status-pill ${map[estado] || "neutro"}">${label}</span>`;
+}
+
+function fmtDateShort(iso) {
+  if (!iso) return "";
+  const raw = String(iso).slice(0, 10);
+  const [y, m, d] = raw.split("-");
+  if (!y || !m || !d) return raw;
+  return `${d}/${m}/${y}`;
+}
+
+function isActCancelled(a) {
+  return a?.status === "cancelada";
 }
 
 function prevAct(actId) {
@@ -107,7 +126,7 @@ function applyActivityDerived(row) {
 }
 
 function recalcGlobalProgress() {
-  const rows = [...document.querySelectorAll(".exec-row[data-act-id]")];
+  const rows = [...document.querySelectorAll(".exec-row[data-act-id]:not(.is-cancelled)")];
   if (!rows.length) {
     document.getElementById("global_progress_label").textContent = "0%";
     document.getElementById("global_progress_bar").style.width = "0%";
@@ -141,10 +160,6 @@ function recalcBudget() {
 }
 
 function renderSummary(pilar) {
-  const objs =
-    (pilar.objectivos || []).map((o) => `<li>${escapeHtml(o.descricao)}</li>`).join("") ||
-    (pilar.obj_geral ? `<li>${escapeHtml(pilar.obj_geral)}</li>` : "<li class='empty-hint'>Sem objectivos</li>");
-
   const riscos =
     (pilar.riscos || [])
       .map(
@@ -155,7 +170,7 @@ function renderSummary(pilar) {
           <span class="status-pill neutro">${escapeHtml(enumLabel(r.probabilidade))}</span>
           <span class="status-pill neutro">Impacto: ${escapeHtml(enumLabel(r.impacto))}</span>
         </div>
-        ${r.mitigacao ? `<p><span>Mitigacao:</span> ${escapeHtml(r.mitigacao)}</p>` : ""}
+        ${r.mitigacao ? `<p class="pre-wrap"><span>Mitigacao:</span> ${escapeHtml(r.mitigacao)}</p>` : ""}
       </div>`
       )
       .join("") || `<p class="empty-hint">Sem riscos cadastrados.</p>`;
@@ -178,8 +193,7 @@ function renderSummary(pilar) {
     <div class="aval-summary-grid">
       <div class="aval-summary-card">
         <h4>Objectivo geral</h4>
-        <p>${escapeHtml(pilar.obj_geral || "—")}</p>
-        <ul class="list-plain">${objs}</ul>
+        <p class="pre-wrap">${escapeHtml(pilar.obj_geral || "—")}</p>
       </div>
       <div class="aval-summary-card">
         <h4>Orcamento</h4>
@@ -193,17 +207,17 @@ function renderSummary(pilar) {
       </div>
       ${
         pilar.descricao
-          ? `<div class="aval-summary-card full"><h4>Descricao</h4><p>${escapeHtml(pilar.descricao)}</p></div>`
+          ? `<div class="aval-summary-card full"><h4>Descricao</h4><p class="pre-wrap">${escapeHtml(pilar.descricao)}</p></div>`
           : ""
       }
       ${
         pilar.kpis
-          ? `<div class="aval-summary-card"><h4>KPIs</h4><p>${escapeHtml(pilar.kpis)}</p></div>`
+          ? `<div class="aval-summary-card"><h4>KPIs</h4><p class="pre-wrap">${escapeHtml(pilar.kpis)}</p></div>`
           : ""
       }
       ${
         pilar.beneficios
-          ? `<div class="aval-summary-card"><h4>Beneficios</h4><p>${escapeHtml(pilar.beneficios)}</p></div>`
+          ? `<div class="aval-summary-card"><h4>Beneficios</h4><p class="pre-wrap">${escapeHtml(pilar.beneficios)}</p></div>`
           : ""
       }
     </div>`;
@@ -408,11 +422,32 @@ function renderForm(pilar) {
           <tbody>
             ${acts
               .map((a) => {
+                const cancelled = isActCancelled(a);
                 const prev = prevAct(a.id);
                 const minPct = Number(prev?.pct_conclusao || 0);
                 const startPct = minPct;
                 const prevInicio = prev?.data_inicio_real || "";
                 const prevFim = prev?.data_fim_real || "";
+                const iniPrev = fmtDateShort(a.data_inicio_prevista);
+                const fimPrev = fmtDateShort(a.data_fim_prevista);
+                const planned =
+                  iniPrev || fimPrev
+                    ? `<div class="muted-cell">Previsto: ${iniPrev || "?"} → ${fimPrev || "?"}</div>`
+                    : "";
+                if (cancelled) {
+                  return `
+              <tr class="exec-row is-cancelled" data-act-id="${a.id}" data-cancelled="1">
+                <td>
+                  <strong>${escapeHtml(a.nome)}</strong>
+                  ${a.responsavel ? `<div class="muted-cell">${escapeHtml(a.responsavel)}</div>` : ""}
+                  ${planned}
+                </td>
+                <td class="exec-estado-badge">${estadoBadge("cancelada")}</td>
+                <td><span class="muted-cell">${minPct ? `${minPct}% (anterior)` : "—"}</span></td>
+                <td><span class="muted-cell">—</span></td>
+                <td><span class="muted-cell">—</span></td>
+              </tr>`;
+                }
                 return `
               <tr class="exec-row" data-act-id="${a.id}" data-prev-inicio="${escapeHtml(
                   prevInicio
@@ -420,6 +455,7 @@ function renderForm(pilar) {
                 <td>
                   <strong>${escapeHtml(a.nome)}</strong>
                   ${a.responsavel ? `<div class="muted-cell">${escapeHtml(a.responsavel)}</div>` : ""}
+                  ${planned}
                 </td>
                 <td class="exec-estado-badge">${estadoBadge(estadoFromPct(startPct))}</td>
                 <td>
@@ -434,7 +470,7 @@ function renderForm(pilar) {
         </table>
       </div>`;
 
-    exec.querySelectorAll(".exec-row").forEach((row) => {
+    exec.querySelectorAll(".exec-row:not(.is-cancelled)").forEach((row) => {
       applyActivityDerived(row);
       row.querySelector(".exec-pct")?.addEventListener("input", () => {
         applyActivityDerived(row);
@@ -495,25 +531,27 @@ function buildPayload() {
 
   const progresso = recalcGlobalProgress();
 
-  const actividades = [...document.querySelectorAll(".exec-row[data-act-id]")].map((el) => {
-    const input = el.querySelector(".exec-pct");
-    const pct = Number(input?.value || 0);
-    const min = Number(input?.dataset.min || 0);
-    if (pct < min) {
-      throw new Error(
-        `A % de conclusao nao pode ser inferior a ${min}% (valor da avaliacao anterior).`
-      );
+  const actividades = [...document.querySelectorAll(".exec-row[data-act-id]:not(.is-cancelled)")].map(
+    (el) => {
+      const input = el.querySelector(".exec-pct");
+      const pct = Number(input?.value || 0);
+      const min = Number(input?.dataset.min || 0);
+      if (pct < min) {
+        throw new Error(
+          `A % de conclusao nao pode ser inferior a ${min}% (valor da avaliacao anterior).`
+        );
+      }
+      if (pct < 0 || pct > 100) throw new Error("A % de conclusao deve estar entre 0 e 100.");
+      return {
+        pilar_actividade_id: Number(el.dataset.actId),
+        estado: estadoFromPct(pct),
+        pct_conclusao: pct,
+        data_inicio_real: el.querySelector(".exec-inicio")?.value || null,
+        data_fim_real: el.querySelector(".exec-fim")?.value || null,
+        obs_execucao: null,
+      };
     }
-    if (pct < 0 || pct > 100) throw new Error("A % de conclusao deve estar entre 0 e 100.");
-    return {
-      pilar_actividade_id: Number(el.dataset.actId),
-      estado: estadoFromPct(pct),
-      pct_conclusao: pct,
-      data_inicio_real: el.querySelector(".exec-inicio")?.value || null,
-      data_fim_real: el.querySelector(".exec-fim")?.value || null,
-      obs_execucao: null,
-    };
-  });
+  );
 
   const orcamentos = [...document.querySelectorAll("#budget_rows tr[data-cat-id]")].map((tr) => {
     const input = tr.querySelector(".executed-val");

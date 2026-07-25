@@ -49,6 +49,13 @@ class ActividadeEstado(str, enum.Enum):
     concluida = "concluida"
 
 
+class ActividadeStatus(str, enum.Enum):
+    """Estado de planeamento da actividade no projecto (nao confundir com execucao)."""
+
+    activa = "activa"
+    cancelada = "cancelada"
+
+
 def utcnow() -> datetime:
     return datetime.now(timezone.utc)
 

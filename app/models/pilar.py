@@ -20,6 +20,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 from app.models.enums import (
+    ActividadeStatus,
     Impacto,
     PilarStatus,
     Prioridade,
@@ -136,6 +137,11 @@ class PilarActividade(Base):
     data_fim_prevista: Mapped[date | None] = mapped_column(Date, nullable=True)
     descricao: Mapped[str | None] = mapped_column(Text, nullable=True)
     obs_planeamento: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[ActividadeStatus] = mapped_column(
+        Enum(ActividadeStatus, name="actividade_status", native_enum=False, length=20),
+        default=ActividadeStatus.activa,
+        nullable=False,
+    )
     ordem: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     pilar = relationship("Pilar", back_populates="actividades")

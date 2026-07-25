@@ -7,7 +7,7 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models.enums import Impacto, PilarStatus, Prioridade, Probabilidade
+from app.models.enums import ActividadeStatus, Impacto, PilarStatus, Prioridade, Probabilidade
 
 
 class PilarListItem(BaseModel):
@@ -53,6 +53,7 @@ class ObjectivoIn(BaseModel):
 
 
 class ActividadeIn(BaseModel):
+    id: int | None = None  # se presente em PATCH, actualiza a actividade existente
     nome: str
     responsavel: str = ""
     prioridade: Prioridade = Prioridade.media
@@ -60,6 +61,7 @@ class ActividadeIn(BaseModel):
     data_fim_prevista: date | None = None
     descricao: str | None = None
     obs_planeamento: str | None = None
+    status: ActividadeStatus = ActividadeStatus.activa
     ordem: int = 0
 
 

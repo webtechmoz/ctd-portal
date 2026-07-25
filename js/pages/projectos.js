@@ -37,10 +37,21 @@ async function showDetail(id) {
   try {
     const { pilar } = await api(`/pilares/${id}`);
     const objs = (pilar.objectivos || [])
-      .map((o) => `<li>${escapeHtml(o.descricao)}</li>`)
-      .join("") || "<li class='empty-hint'>Sem objectivos</li>";
+      .map((o) => o.descricao?.trim())
+      .filter((d) => d && d !== (pilar.obj_geral || "").trim())
+      .map((d) => `<li>${escapeHtml(d)}</li>`)
+      .join("");
     const acts = (pilar.actividades || [])
-      .map((a) => `<li><strong>${escapeHtml(a.nome)}</strong> — ${escapeHtml(a.responsavel || "—")}</li>`)
+      .map((a) => {
+        const cancelled = a.status === "cancelada";
+        const dates =
+          a.data_inicio_prevista || a.data_fim_prevista
+            ? ` · ${a.data_inicio_prevista || "?"} → ${a.data_fim_prevista || "?"}`
+            : "";
+        return `<li class="${cancelled ? "is-cancelled-text" : ""}"><strong>${escapeHtml(a.nome)}</strong> — ${escapeHtml(
+          a.responsavel || "—"
+        )}${escapeHtml(dates)}${cancelled ? " <em>(cancelada)</em>" : ""}</li>`;
+      })
       .join("") || "<li class='empty-hint'>Sem actividades</li>";
     const cats = (pilar.orcamento_categorias || [])
       .map((c) => `<li>${escapeHtml(c.categoria)}: ${money(c.valor_alocado)}</li>`)
@@ -66,12 +77,12 @@ async function showDetail(id) {
           <h4>Contexto</h4>
           <p><strong>Area:</strong> ${escapeHtml(pilar.area || "—")}</p>
           <p><strong>Fase:</strong> ${escapeHtml(pilar.fase || "—")}</p>
-          <p class="muted">${escapeHtml(pilar.descricao || "")}</p>
+          <p class="muted pre-wrap">${escapeHtml(pilar.descricao || "")}</p>
         </div>
         <div>
-          <h4>Objectivos</h4>
-          <p class="muted">${escapeHtml(pilar.obj_geral || "")}</p>
-          <ul class="list-plain">${objs}</ul>
+          <h4>Objectivo geral</h4>
+          <p class="pre-wrap">${escapeHtml(pilar.obj_geral || "—")}</p>
+          ${objs ? `<ul class="list-plain">${objs}</ul>` : ""}
         </div>
         <div>
           <h4>Actividades planeadas</h4>
