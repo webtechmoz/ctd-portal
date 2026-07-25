@@ -86,6 +86,15 @@ def _set_nested_create(pilar: Pilar, data: PilarWrite) -> None:
         )
 
 
+def _sync_orc_aprovado(pilar: Pilar) -> None:
+    """Orcamento global = soma das rubricas (fonte unica de verdade)."""
+    total = sum(
+        (Decimal(str(c.valor_alocado or 0)) for c in pilar.orcamento_categorias),
+        Decimal("0"),
+    )
+    pilar.orc_aprovado = total
+
+
 def _append_nested(pilar: Pilar, data: PilarUpdate) -> None:
     base_obj = len(pilar.objectivos)
     for i, row in enumerate(data.objectivos or []):
@@ -108,23 +117,42 @@ def _append_nested(pilar: Pilar, data: PilarUpdate) -> None:
         )
     base_orc = len(pilar.orcamento_categorias)
     for i, row in enumerate(data.orcamento_categorias or []):
+        if row.id:
+            cat = next((c for c in pilar.orcamento_categorias if c.id == row.id), None)
+            if cat:
+                cat.categoria = row.categoria
+                cat.valor_alocado = row.valor_alocado
+                cat.obs = row.obs
+                if row.ordem:
+                    cat.ordem = row.ordem
+                continue
         pilar.orcamento_categorias.append(
             PilarOrcamentoCategoria(
                 categoria=row.categoria,
                 valor_alocado=row.valor_alocado,
                 obs=row.obs,
-                ordem=base_orc + i,
+                ordem=row.ordem if row.ordem else base_orc + i,
             )
         )
     base_risco = len(pilar.riscos)
     for i, row in enumerate(data.riscos or []):
+        if row.id:
+            risco = next((r for r in pilar.riscos if r.id == row.id), None)
+            if risco:
+                risco.descricao = row.descricao
+                risco.probabilidade = row.probabilidade
+                risco.impacto = row.impacto
+                risco.mitigacao = row.mitigacao
+                if row.ordem:
+                    risco.ordem = row.ordem
+                continue
         pilar.riscos.append(
             PilarRisco(
                 descricao=row.descricao,
                 probabilidade=row.probabilidade,
                 impacto=row.impacto,
                 mitigacao=row.mitigacao,
-                ordem=base_risco + i,
+                ordem=row.ordem if row.ordem else base_risco + i,
             )
         )
     base_passo = len(pilar.proximos_passos)
@@ -229,6 +257,8 @@ def create_pilar(session: Session, data: PilarWrite) -> PilarMasterOut:
     session.flush()
     _set_nested_create(pilar, data)
     session.flush()
+    _sync_orc_aprovado(pilar)
+    session.flush()
     refreshed = pilar_repo.get_with_master(session, pilar.id)
     return PilarMasterOut.model_validate(refreshed)
 
@@ -257,6 +287,8 @@ def update_pilar(session: Session, pilar_id: int, data: PilarUpdate) -> PilarMas
     _apply_deletes(session, pilar, data)
     session.flush()
     _append_nested(pilar, data)
+    session.flush()
+    _sync_orc_aprovado(pilar)
     session.flush()
     refreshed = pilar_repo.get_with_master(session, pilar.id)
     return PilarMasterOut.model_validate(refreshed)

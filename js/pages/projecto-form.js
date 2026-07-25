@@ -44,6 +44,12 @@ function escapeHtml(str) {
     .replaceAll(">", "&gt;");
 }
 
+function formatMoney(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return String(value ?? "0");
+  return n.toLocaleString("pt-MZ", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 function reEnhance(select) {
   if (!select) return;
   if (select.dataset.enhanced === "1") {
@@ -65,18 +71,24 @@ function reEnhance(select) {
 let catalogData = { categories: {}, options: {} };
 let draft = emptyDraft();
 let proxPicker = null;
+/** @type {{ kind: 'existing' | 'pending', id?: number, index?: number } | null} */
+let editOrc = null;
+/** @type {{ kind: 'existing' | 'pending', id?: number, index?: number } | null} */
+let editRisco = null;
 
 function emptyDraft(pilar = null) {
   return {
     existingActs: [...(pilar?.actividades || [])],
-    existingOrcs: [...(pilar?.orcamento_categorias || [])],
-    existingRiscos: [...(pilar?.riscos || [])],
+    existingOrcs: [...(pilar?.orcamento_categorias || [])].map((o) => ({ ...o })),
+    existingRiscos: [...(pilar?.riscos || [])].map((r) => ({ ...r })),
     pendingActs: [],
     pendingOrcs: [],
     pendingRiscos: [],
     deleteActs: new Set(),
     deleteOrcs: new Set(),
     deleteRiscos: new Set(),
+    dirtyOrcs: new Set(),
+    dirtyRiscos: new Set(),
   };
 }
 
@@ -105,10 +117,20 @@ function fillCatalogSelect(select, category, preferred) {
   reEnhance(select);
 }
 
+function syncOrcTotal() {
+  const total =
+    draft.existingOrcs
+      .filter((o) => !draft.deleteOrcs.has(o.id))
+      .reduce((sum, o) => sum + (Number(o.valor_alocado) || 0), 0) +
+    draft.pendingOrcs.reduce((sum, o) => sum + (Number(o.valor_alocado) || 0), 0);
+  const el = document.getElementById("p_orc");
+  if (el) el.value = total ? total.toFixed(2) : "0.00";
+}
+
 function paintChips() {
   const actEl = document.getElementById("p_act_chips");
-  const orcEl = document.getElementById("p_orc_chips");
-  const riscoEl = document.getElementById("p_risco_chips");
+  const orcEl = document.getElementById("p_orc_list");
+  const riscoEl = document.getElementById("p_risco_list");
 
   actEl.innerHTML = [
     ...draft.existingActs.map((a) => {
@@ -126,41 +148,89 @@ function paintChips() {
     ),
   ].join("") || `<p class="empty-chips">Nenhuma actividade ainda.</p>`;
 
-  orcEl.innerHTML = [
+  const orcRows = [
     ...draft.existingOrcs.map((o) => {
       const del = draft.deleteOrcs.has(o.id);
-      return `<span class="chip ${del ? "muted" : ""}" data-kind="orc" data-id="${o.id}">
-        <span>${escapeHtml(o.categoria)} · ${o.valor_alocado}</span>
-        <button type="button" title="${del ? "Restaurar" : "Remover"}"><i class="bi ${del ? "bi-arrow-counterclockwise" : "bi-x"}"></i></button>
-      </span>`;
+      return `<li class="nested-item ${del ? "is-removed" : ""}" data-kind="orc" data-id="${o.id}">
+        <div class="nested-item-body">
+          <strong>${escapeHtml(o.categoria)}</strong>
+          <span class="nested-item-meta">${formatMoney(o.valor_alocado)}</span>
+        </div>
+        <div class="nested-item-actions">
+          ${
+            del
+              ? ""
+              : `<button type="button" class="nested-item-btn" data-action="edit" title="Editar"><i class="bi bi-pencil"></i></button>`
+          }
+          <button type="button" class="nested-item-btn" data-action="toggle" title="${del ? "Restaurar" : "Remover"}">
+            <i class="bi ${del ? "bi-arrow-counterclockwise" : "bi-trash"}"></i>
+          </button>
+        </div>
+      </li>`;
     }),
     ...draft.pendingOrcs.map(
-      (o, i) => `<span class="chip" data-kind="orc-new" data-i="${i}">
-        <span>+ ${escapeHtml(o.categoria)} · ${o.valor_alocado}</span>
-        <button type="button"><i class="bi bi-x"></i></button>
-      </span>`
+      (o, i) => `<li class="nested-item is-new" data-kind="orc-new" data-i="${i}">
+        <div class="nested-item-body">
+          <strong>${escapeHtml(o.categoria)}</strong>
+          <span class="nested-item-meta">${formatMoney(o.valor_alocado)}</span>
+        </div>
+        <div class="nested-item-actions">
+          <button type="button" class="nested-item-btn" data-action="edit" title="Editar"><i class="bi bi-pencil"></i></button>
+          <button type="button" class="nested-item-btn" data-action="remove" title="Remover"><i class="bi bi-trash"></i></button>
+        </div>
+      </li>`
     ),
-  ].join("") || `<p class="empty-chips">Nenhuma rubrica ainda.</p>`;
+  ];
+  orcEl.innerHTML = orcRows.length
+    ? `<ul class="nested-item-list">${orcRows.join("")}</ul>`
+    : `<p class="empty-chips">Nenhuma rubrica ainda.</p>`;
 
-  riscoEl.innerHTML = [
+  const riscoRows = [
     ...draft.existingRiscos.map((r) => {
       const del = draft.deleteRiscos.has(r.id);
-      return `<span class="chip ${del ? "muted" : ""}" data-kind="risco" data-id="${r.id}">
-        <span>${escapeHtml(r.descricao)} · ${escapeHtml(r.probabilidade)}/${escapeHtml(r.impacto)}</span>
-        <button type="button"><i class="bi ${del ? "bi-arrow-counterclockwise" : "bi-x"}"></i></button>
-      </span>`;
+      return `<li class="nested-item ${del ? "is-removed" : ""}" data-kind="risco" data-id="${r.id}">
+        <div class="nested-item-body">
+          <strong>${escapeHtml(r.descricao)}</strong>
+          <span class="nested-item-meta">${escapeHtml(r.probabilidade)} / ${escapeHtml(r.impacto)}${
+            r.mitigacao ? ` · ${escapeHtml(r.mitigacao)}` : ""
+          }</span>
+        </div>
+        <div class="nested-item-actions">
+          ${
+            del
+              ? ""
+              : `<button type="button" class="nested-item-btn" data-action="edit" title="Editar"><i class="bi bi-pencil"></i></button>`
+          }
+          <button type="button" class="nested-item-btn" data-action="toggle" title="${del ? "Restaurar" : "Remover"}">
+            <i class="bi ${del ? "bi-arrow-counterclockwise" : "bi-trash"}"></i>
+          </button>
+        </div>
+      </li>`;
     }),
     ...draft.pendingRiscos.map(
-      (r, i) => `<span class="chip" data-kind="risco-new" data-i="${i}">
-        <span>+ ${escapeHtml(r.descricao)} · ${escapeHtml(r.probabilidade)}/${escapeHtml(r.impacto)}</span>
-        <button type="button"><i class="bi bi-x"></i></button>
-      </span>`
+      (r, i) => `<li class="nested-item is-new" data-kind="risco-new" data-i="${i}">
+        <div class="nested-item-body">
+          <strong>${escapeHtml(r.descricao)}</strong>
+          <span class="nested-item-meta">${escapeHtml(r.probabilidade)} / ${escapeHtml(r.impacto)}${
+            r.mitigacao ? ` · ${escapeHtml(r.mitigacao)}` : ""
+          }</span>
+        </div>
+        <div class="nested-item-actions">
+          <button type="button" class="nested-item-btn" data-action="edit" title="Editar"><i class="bi bi-pencil"></i></button>
+          <button type="button" class="nested-item-btn" data-action="remove" title="Remover"><i class="bi bi-trash"></i></button>
+        </div>
+      </li>`
     ),
-  ].join("") || `<p class="empty-chips">Nenhum risco ainda.</p>`;
+  ];
+  riscoEl.innerHTML = riscoRows.length
+    ? `<ul class="nested-item-list">${riscoRows.join("")}</ul>`
+    : `<p class="empty-chips">Nenhum risco ainda.</p>`;
+
+  syncOrcTotal();
 }
 
-function bindChipClicks(rootId) {
-  document.getElementById(rootId)?.addEventListener("click", (e) => {
+function bindActChipClicks() {
+  document.getElementById("p_act_chips")?.addEventListener("click", (e) => {
     const btn = e.target.closest("button");
     const chip = e.target.closest(".chip");
     if (!btn || !chip) return;
@@ -170,22 +240,105 @@ function bindChipClicks(rootId) {
       if (draft.deleteActs.has(id)) draft.deleteActs.delete(id);
       else draft.deleteActs.add(id);
     } else if (kind === "act-new") draft.pendingActs.splice(Number(chip.dataset.i), 1);
-    else if (kind === "orc") {
-      const id = Number(chip.dataset.id);
-      if (draft.deleteOrcs.has(id)) draft.deleteOrcs.delete(id);
-      else draft.deleteOrcs.add(id);
-    } else if (kind === "orc-new") draft.pendingOrcs.splice(Number(chip.dataset.i), 1);
-    else if (kind === "risco") {
-      const id = Number(chip.dataset.id);
-      if (draft.deleteRiscos.has(id)) draft.deleteRiscos.delete(id);
-      else draft.deleteRiscos.add(id);
-    } else if (kind === "risco-new") draft.pendingRiscos.splice(Number(chip.dataset.i), 1);
     paintChips();
   });
 }
-bindChipClicks("p_act_chips");
-bindChipClicks("p_orc_chips");
-bindChipClicks("p_risco_chips");
+bindActChipClicks();
+
+function openOrcModal(mode) {
+  editOrc = mode;
+  const isEdit = Boolean(mode);
+  document.getElementById("modal-orc-title").textContent = isEdit ? "Editar rubrica" : "Nova rubrica";
+  document.getElementById("btn-confirm-orc").textContent = isEdit ? "Guardar" : "Adicionar";
+  openModal(document.getElementById("modal-orc"));
+}
+
+function openRiscoModal(mode) {
+  editRisco = mode;
+  const isEdit = Boolean(mode);
+  document.getElementById("modal-risco-title").textContent = isEdit ? "Editar risco" : "Novo risco";
+  document.getElementById("btn-confirm-risco").textContent = isEdit ? "Guardar" : "Adicionar";
+  openModal(document.getElementById("modal-risco"));
+}
+
+function bindNestedList(rootId) {
+  document.getElementById(rootId)?.addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-action]");
+    const row = e.target.closest(".nested-item");
+    if (!btn || !row) return;
+    const action = btn.dataset.action;
+    const kind = row.dataset.kind;
+
+    if (kind === "orc" || kind === "orc-new") {
+      if (action === "edit") {
+        if (kind === "orc") {
+          const id = Number(row.dataset.id);
+          const item = draft.existingOrcs.find((o) => o.id === id);
+          if (!item || draft.deleteOrcs.has(id)) return;
+          document.getElementById("orc_cat").value = item.categoria || "";
+          document.getElementById("orc_val").value = item.valor_alocado ?? "0";
+          openOrcModal({ kind: "existing", id });
+        } else {
+          const index = Number(row.dataset.i);
+          const item = draft.pendingOrcs[index];
+          if (!item) return;
+          document.getElementById("orc_cat").value = item.categoria || "";
+          document.getElementById("orc_val").value = item.valor_alocado ?? "0";
+          openOrcModal({ kind: "pending", index });
+        }
+        return;
+      }
+      if (action === "toggle" && kind === "orc") {
+        const id = Number(row.dataset.id);
+        if (draft.deleteOrcs.has(id)) draft.deleteOrcs.delete(id);
+        else draft.deleteOrcs.add(id);
+      } else if (action === "remove" && kind === "orc-new") {
+        draft.pendingOrcs.splice(Number(row.dataset.i), 1);
+      }
+      paintChips();
+      return;
+    }
+
+    if (kind === "risco" || kind === "risco-new") {
+      if (action === "edit") {
+        if (kind === "risco") {
+          const id = Number(row.dataset.id);
+          const item = draft.existingRiscos.find((r) => r.id === id);
+          if (!item || draft.deleteRiscos.has(id)) return;
+          document.getElementById("risco_desc").value = item.descricao || "";
+          document.getElementById("risco_nivel").value = item.probabilidade || "media";
+          document.getElementById("risco_impacto").value = item.impacto || "medio";
+          document.getElementById("risco_mit").value = item.mitigacao || "";
+          reEnhance(document.getElementById("risco_nivel"));
+          reEnhance(document.getElementById("risco_impacto"));
+          openRiscoModal({ kind: "existing", id });
+        } else {
+          const index = Number(row.dataset.i);
+          const item = draft.pendingRiscos[index];
+          if (!item) return;
+          document.getElementById("risco_desc").value = item.descricao || "";
+          document.getElementById("risco_nivel").value = item.probabilidade || "media";
+          document.getElementById("risco_impacto").value = item.impacto || "medio";
+          document.getElementById("risco_mit").value = item.mitigacao || "";
+          reEnhance(document.getElementById("risco_nivel"));
+          reEnhance(document.getElementById("risco_impacto"));
+          openRiscoModal({ kind: "pending", index });
+        }
+        return;
+      }
+      if (action === "toggle" && kind === "risco") {
+        const id = Number(row.dataset.id);
+        if (draft.deleteRiscos.has(id)) draft.deleteRiscos.delete(id);
+        else draft.deleteRiscos.add(id);
+      } else if (action === "remove" && kind === "risco-new") {
+        draft.pendingRiscos.splice(Number(row.dataset.i), 1);
+      }
+      paintChips();
+    }
+  });
+}
+bindNestedList("p_orc_list");
+bindNestedList("p_risco_list");
 
 function syncProximaFromPeriod() {
   const days = Number(document.getElementById("p_period").value || 90);
@@ -196,6 +349,8 @@ function syncProximaFromPeriod() {
 
 function fillForm(pilar) {
   draft = emptyDraft(pilar);
+  editOrc = null;
+  editRisco = null;
   document.getElementById("p_edit_id").value = pilar?.id || "";
   document.getElementById("pilar-page-title").textContent = pilar?.id
     ? "Editar projecto"
@@ -204,7 +359,6 @@ function fillForm(pilar) {
   document.getElementById("btn-save-pilar").textContent = pilar?.id ? "Actualizar" : "Guardar projecto";
   document.getElementById("p_nome").value = pilar?.nome || "";
   document.getElementById("p_status").value = pilar?.status || "activo";
-  document.getElementById("p_orc").value = pilar?.orc_aprovado ?? "";
   document.getElementById("p_period").value = pilar?.periodicidade_dias ?? 90;
   document.getElementById("p_desc").value = pilar?.descricao || "";
   document.getElementById("p_obj").value = pilar?.obj_geral || "";
@@ -305,15 +459,29 @@ document.getElementById("btn-confirm-act")?.addEventListener("click", () => {
 document.getElementById("btn-add-orc")?.addEventListener("click", () => {
   document.getElementById("orc_cat").value = "";
   document.getElementById("orc_val").value = "0";
-  openModal(document.getElementById("modal-orc"));
+  openOrcModal(null);
 });
 document.getElementById("btn-confirm-orc")?.addEventListener("click", () => {
   const categoria = document.getElementById("orc_cat").value.trim();
   if (!categoria) return toast("Indique a categoria.", "error");
-  draft.pendingOrcs.push({
-    categoria,
-    valor_alocado: document.getElementById("orc_val").value || "0",
-  });
+  const valor_alocado = document.getElementById("orc_val").value || "0";
+  if (editOrc?.kind === "existing") {
+    const item = draft.existingOrcs.find((o) => o.id === editOrc.id);
+    if (item) {
+      item.categoria = categoria;
+      item.valor_alocado = valor_alocado;
+      draft.dirtyOrcs.add(item.id);
+    }
+  } else if (editOrc?.kind === "pending") {
+    const item = draft.pendingOrcs[editOrc.index];
+    if (item) {
+      item.categoria = categoria;
+      item.valor_alocado = valor_alocado;
+    }
+  } else {
+    draft.pendingOrcs.push({ categoria, valor_alocado });
+  }
+  editOrc = null;
   closeModal(document.getElementById("modal-orc"));
   paintChips();
 });
@@ -325,17 +493,30 @@ document.getElementById("btn-add-risco")?.addEventListener("click", () => {
   document.getElementById("risco_mit").value = "";
   reEnhance(document.getElementById("risco_nivel"));
   reEnhance(document.getElementById("risco_impacto"));
-  openModal(document.getElementById("modal-risco"));
+  openRiscoModal(null);
 });
 document.getElementById("btn-confirm-risco")?.addEventListener("click", () => {
   const descricao = document.getElementById("risco_desc").value.trim();
   if (!descricao) return toast("Descreva o risco.", "error");
-  draft.pendingRiscos.push({
+  const payload = {
     descricao,
     probabilidade: document.getElementById("risco_nivel").value,
     impacto: document.getElementById("risco_impacto").value,
     mitigacao: document.getElementById("risco_mit").value.trim() || null,
-  });
+  };
+  if (editRisco?.kind === "existing") {
+    const item = draft.existingRiscos.find((r) => r.id === editRisco.id);
+    if (item) {
+      Object.assign(item, payload);
+      draft.dirtyRiscos.add(item.id);
+    }
+  } else if (editRisco?.kind === "pending") {
+    const item = draft.pendingRiscos[editRisco.index];
+    if (item) Object.assign(item, payload);
+  } else {
+    draft.pendingRiscos.push(payload);
+  }
+  editRisco = null;
   closeModal(document.getElementById("modal-risco"));
   paintChips();
 });
@@ -347,12 +528,13 @@ document.getElementById("pilar-form")?.addEventListener("submit", async (e) => {
     return;
   }
   const editId = document.getElementById("p_edit_id").value;
+  syncOrcTotal();
   const base = {
     nome: document.getElementById("p_nome").value.trim(),
     area: document.getElementById("p_area").value,
     fase: document.getElementById("p_fase").value,
     status: document.getElementById("p_status").value,
-    orc_aprovado: document.getElementById("p_orc").value || null,
+    orc_aprovado: document.getElementById("p_orc").value || "0",
     orc_moeda: document.getElementById("p_moeda").value || "MZN",
     orc_fonte: document.getElementById("p_fonte").value || null,
     periodicidade_dias: Number(document.getElementById("p_period").value || 90),
@@ -363,8 +545,34 @@ document.getElementById("pilar-form")?.addEventListener("submit", async (e) => {
     beneficios: document.getElementById("p_benef").value,
   };
   if (draft.pendingActs.length) base.actividades = draft.pendingActs;
-  if (draft.pendingOrcs.length) base.orcamento_categorias = draft.pendingOrcs;
-  if (draft.pendingRiscos.length) base.riscos = draft.pendingRiscos;
+
+  const orcPayload = [
+    ...draft.existingOrcs
+      .filter((o) => !draft.deleteOrcs.has(o.id) && draft.dirtyOrcs.has(o.id))
+      .map((o) => ({
+        id: o.id,
+        categoria: o.categoria,
+        valor_alocado: o.valor_alocado,
+        obs: o.obs ?? null,
+      })),
+    ...draft.pendingOrcs,
+  ];
+  if (orcPayload.length) base.orcamento_categorias = orcPayload;
+
+  const riscoPayload = [
+    ...draft.existingRiscos
+      .filter((r) => !draft.deleteRiscos.has(r.id) && draft.dirtyRiscos.has(r.id))
+      .map((r) => ({
+        id: r.id,
+        descricao: r.descricao,
+        probabilidade: r.probabilidade,
+        impacto: r.impacto,
+        mitigacao: r.mitigacao ?? null,
+      })),
+    ...draft.pendingRiscos,
+  ];
+  if (riscoPayload.length) base.riscos = riscoPayload;
+
   if (editId) {
     base.delete_actividade_ids = [...draft.deleteActs];
     base.delete_categoria_ids = [...draft.deleteOrcs];

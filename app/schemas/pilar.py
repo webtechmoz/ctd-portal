@@ -64,6 +64,7 @@ class ActividadeIn(BaseModel):
 
 
 class OrcamentoCatIn(BaseModel):
+    id: int | None = None  # se presente em PATCH, actualiza a rubrica existente
     categoria: str
     valor_alocado: Decimal = Decimal("0")
     obs: str | None = None
@@ -71,6 +72,7 @@ class OrcamentoCatIn(BaseModel):
 
 
 class RiscoIn(BaseModel):
+    id: int | None = None  # se presente em PATCH, actualiza o risco existente
     descricao: str
     probabilidade: Probabilidade = Probabilidade.media
     impacto: Impacto = Impacto.medio

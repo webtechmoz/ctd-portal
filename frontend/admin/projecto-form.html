@@ -59,7 +59,11 @@
             </div>
           </header>
           <div class="field-grid">
-            <label class="field"><span>Orcamento aprovado</span><input id="p_orc" type="number" step="0.01" min="0" placeholder="0.00" /></label>
+            <label class="field">
+              <span>Orcamento global</span>
+              <input id="p_orc" type="number" step="0.01" min="0" placeholder="0.00" readonly />
+              <small class="field-note">Calculado automaticamente pela soma das rubricas orcamentais.</small>
+            </label>
             <label class="field"><span>Moeda</span><select id="p_moeda"></select></label>
             <label class="field full"><span>Fonte de financiamento</span><select id="p_fonte"></select></label>
             <label class="field"><span>Periodicidade (dias)</span><input id="p_period" type="number" min="1" value="90" /></label>
@@ -108,7 +112,7 @@
             </div>
           </header>
           <div class="nested-block nested-block-flush">
-            <div id="p_orc_chips" class="chip-row"></div>
+            <div id="p_orc_list" class="nested-items"></div>
             <div class="nested-actions">
               <button type="button" class="btn btn-outline compact" id="btn-add-orc"><i class="bi bi-plus-lg"></i> Adicionar rubrica</button>
             </div>
@@ -124,7 +128,7 @@
             </div>
           </header>
           <div class="nested-block nested-block-flush">
-            <div id="p_risco_chips" class="chip-row"></div>
+            <div id="p_risco_list" class="nested-items"></div>
             <div class="nested-actions">
               <button type="button" class="btn btn-outline compact" id="btn-add-risco"><i class="bi bi-plus-lg"></i> Adicionar risco</button>
             </div>
@@ -175,7 +179,7 @@
   <div class="modal-backdrop" id="modal-orc" hidden>
     <div class="modal-card" role="dialog">
       <div class="modal-head">
-        <h3>Nova rubrica</h3>
+        <h3 id="modal-orc-title">Nova rubrica</h3>
         <button type="button" class="modal-close" data-close-modal><i class="bi bi-x-lg"></i></button>
       </div>
       <div class="modal-body">
@@ -194,7 +198,7 @@
   <div class="modal-backdrop" id="modal-risco" hidden>
     <div class="modal-card" role="dialog">
       <div class="modal-head">
-        <h3>Novo risco</h3>
+        <h3 id="modal-risco-title">Novo risco</h3>
         <button type="button" class="modal-close" data-close-modal><i class="bi bi-x-lg"></i></button>
       </div>
       <div class="modal-body">
