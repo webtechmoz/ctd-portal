@@ -45,6 +45,7 @@ class Pilar(Base, TimestampMixin):
     beneficios: Mapped[str] = mapped_column(Text, nullable=False, default="")
     plano_obs: Mapped[str | None] = mapped_column(Text, nullable=True)
     parceiros: Mapped[str | None] = mapped_column(Text, nullable=True)
+    desenvolvedor: Mapped[str | None] = mapped_column(String(255), nullable=True)
     orc_aprovado: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
     orc_moeda: Mapped[str] = mapped_column(String(10), nullable=False, default="MZN")
     orc_fonte: Mapped[str | None] = mapped_column(String(255), nullable=True)

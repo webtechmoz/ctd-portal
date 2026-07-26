@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy import (
     Boolean,
     Date,
+    DateTime,
     Enum,
     Float,
     ForeignKey,
@@ -21,7 +22,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
-from app.models.enums import ActividadeEstado, TimestampMixin
+from app.models.enums import ActividadeEstado, AvaliacaoStatus, TimestampMixin
 
 
 class Avaliacao(Base, TimestampMixin):
@@ -44,9 +45,25 @@ class Avaliacao(Base, TimestampMixin):
     progresso: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     assinatura: Mapped[str | None] = mapped_column(String(255), nullable=True)
     data_sub: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
+    status: Mapped[AvaliacaoStatus] = mapped_column(
+        Enum(AvaliacaoStatus, name="avaliacao_status", native_enum=False, length=20),
+        default=AvaliacaoStatus.submetida,
+        nullable=False,
+    )
+    validated_by_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    validated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reopened_by_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    reopened_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    validation_note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     pilar = relationship("Pilar", back_populates="avaliacoes")
-    user = relationship("User", back_populates="avaliacoes")
+    user = relationship("User", back_populates="avaliacoes", foreign_keys=[user_id])
+    validated_by = relationship("User", foreign_keys=[validated_by_id])
+    reopened_by = relationship("User", foreign_keys=[reopened_by_id])
     actividades = relationship(
         "AvaliacaoActividade",
         back_populates="avaliacao",

@@ -6,7 +6,7 @@ import { enhanceSelect } from "../components/styled-select.js";
 import { bootPage } from "../shell.js";
 import { toast } from "../ui.js";
 
-const LIST_URL = "/admin#projectos";
+const LIST_URL = "/admin?panel=projectos#projectos";
 
 function parseRoute() {
   const parts = location.pathname.replace(/\/+$/, "").split("/").filter(Boolean);
@@ -457,6 +457,7 @@ function fillForm(pilar) {
   document.getElementById("btn-save-pilar").textContent = pilar?.id ? "Actualizar" : "Guardar projecto";
   document.getElementById("p_nome").value = pilar?.nome || "";
   document.getElementById("p_status").value = pilar?.status || "activo";
+  document.getElementById("p_desenvolvedor").value = pilar?.desenvolvedor || "";
   document.getElementById("p_period").value = pilar?.periodicidade_dias ?? 90;
   document.getElementById("p_desc").value = pilar?.descricao || "";
   document.getElementById("p_obj").value = pilar?.obj_geral || "";
@@ -468,6 +469,11 @@ function fillForm(pilar) {
   fillCatalogSelect(document.getElementById("p_moeda"), "moeda", pilar?.orc_moeda || "MZN");
   fillCatalogSelect(document.getElementById("p_fonte"), "fonte_financiamento", pilar?.orc_fonte || "");
   reEnhance(document.getElementById("p_status"));
+  const respSel = document.getElementById("p_responsavel");
+  if (respSel) {
+    respSel.value = pilar?.responsavel_user_id ? String(pilar.responsavel_user_id) : "";
+    reEnhance(respSel);
+  }
 
   const prox = pilar?.proxima_avaliacao || addDaysISO(pilar?.periodicidade_dias ?? 90);
   document.getElementById("p_prox").value = prox;
@@ -638,6 +644,10 @@ document.getElementById("pilar-form")?.addEventListener("submit", async (e) => {
     area: document.getElementById("p_area").value,
     fase: document.getElementById("p_fase").value,
     status: document.getElementById("p_status").value,
+    desenvolvedor: document.getElementById("p_desenvolvedor").value.trim() || null,
+    responsavel_user_id: document.getElementById("p_responsavel").value
+      ? Number(document.getElementById("p_responsavel").value)
+      : null,
     orc_aprovado: document.getElementById("p_orc").value || "0",
     orc_moeda: document.getElementById("p_moeda").value || "MZN",
     orc_fonte: document.getElementById("p_fonte").value || null,
@@ -721,6 +731,22 @@ document.getElementById("pilar-form")?.addEventListener("submit", async (e) => {
 
 try {
   catalogData = await api("/catalog");
+  try {
+    const { users } = await api("/users/options");
+    const sel = document.getElementById("p_responsavel");
+    if (sel) {
+      const opts = (users || [])
+        .filter((u) => u.status === "active")
+        .map(
+          (u) =>
+            `<option value="${u.id}">${escapeHtml(u.name)} (${escapeHtml(u.email)})</option>`
+        )
+        .join("");
+      sel.innerHTML = `<option value="">—</option>${opts}`;
+    }
+  } catch {
+    /* members picker optional if no users.view */
+  }
   if (route.id) {
     const { pilar } = await api(`/pilares/${route.id}`);
     fillForm(pilar);

@@ -28,6 +28,8 @@ def get_by_id(session: Session, pilar_id: int) -> Pilar | None:
 
 
 def get_with_master(session: Session, pilar_id: int) -> Pilar | None:
+    from app.models.pilar import PilarResponsavel
+
     return session.scalar(
         select(Pilar)
         .where(Pilar.id == pilar_id)
@@ -37,5 +39,6 @@ def get_with_master(session: Session, pilar_id: int) -> Pilar | None:
             selectinload(Pilar.orcamento_categorias),
             selectinload(Pilar.riscos),
             selectinload(Pilar.proximos_passos),
+            selectinload(Pilar.responsaveis).selectinload(PilarResponsavel.user),
         )
     )

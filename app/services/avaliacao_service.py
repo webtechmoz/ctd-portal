@@ -15,20 +15,21 @@ from app.models.avaliacao import (
     AvaliacaoProximoPasso,
     AvaliacaoRisco,
 )
-from app.models.enums import ActividadeEstado, ActividadeStatus, UserRole
+from app.models.enums import ActividadeEstado, ActividadeStatus, AvaliacaoStatus, UserRole, utcnow
 from app.models.pilar import Pilar, PilarProximoPasso, PilarResponsavel
 from app.models.user import User
 from app.repositories import avaliacoes as aval_repo
 from app.repositories import pilares as pilar_repo
 from app.schemas.avaliacao import AvaliacaoCreate, AvaliacaoCreated
 from app.services import auth_service
+from app.services.rbac_service import user_has_permission
 
 
 def user_can_evaluate(session: Session, user: User, pilar_id: int) -> bool:
     role = user.role.value if hasattr(user.role, "value") else str(user.role)
     if role == UserRole.admin.value:
         return True
-    if role != UserRole.member.value:
+    if not user_has_permission(session, user, "avaliacao.submit"):
         return False
     link = session.scalar(
         select(PilarResponsavel).where(
@@ -177,6 +178,7 @@ def create_avaliacao(session: Session, user: User, payload: AvaliacaoCreate) -> 
         progresso=float(progresso),
         assinatura=payload.assinatura,
         data_sub=data_sub,
+        status=AvaliacaoStatus.submetida,
     )
     session.add(avaliacao)
     session.flush()
@@ -229,12 +231,195 @@ def create_avaliacao(session: Session, user: User, payload: AvaliacaoCreate) -> 
     _update_schedule(pilar, data_sub)
     session.flush()
 
+    try:
+        from app.services.notification_service import notify_pending_validation
+
+        notify_pending_validation(session, avaliacao)
+    except Exception:
+        pass
+
     return AvaliacaoCreated(
         id=avaliacao.id,
         pilar_id=pilar.id,
         data_sub=data_sub,
         progresso=float(avaliacao.progresso),
+        status=AvaliacaoStatus.submetida,
     )
+
+
+def _status_val(avaliacao: Avaliacao) -> str:
+    return avaliacao.status.value if hasattr(avaliacao.status, "value") else str(avaliacao.status)
+
+
+def _assert_editable(avaliacao: Avaliacao) -> None:
+    st = _status_val(avaliacao)
+    if st == AvaliacaoStatus.validada.value:
+        raise auth_service.AuthError(
+            "CONFLICT",
+            "Avaliacao validada. Peca ao coordenador para reabrir se precisar editar.",
+            409,
+        )
+    if st not in {AvaliacaoStatus.submetida.value, AvaliacaoStatus.reaberta.value}:
+        raise auth_service.AuthError("CONFLICT", "Estado da avaliacao nao permite edicao.", 409)
+
+
+def update_avaliacao(
+    session: Session, user: User, avaliacao_id: int, payload: AvaliacaoCreate
+) -> AvaliacaoCreated:
+    avaliacao = aval_repo.get_by_id(session, avaliacao_id)
+    if not avaliacao:
+        raise auth_service.AuthError("NOT_FOUND", "Avaliacao nao encontrada.", 404)
+    _assert_editable(avaliacao)
+    role = user.role.value if hasattr(user.role, "value") else str(user.role)
+    if (
+        role != UserRole.admin.value
+        and avaliacao.user_id != user.id
+        and not user_can_evaluate(session, user, avaliacao.pilar_id)
+    ):
+        raise auth_service.AuthError("FORBIDDEN", "Sem permissao para editar esta avaliacao.", 403)
+
+    pilar = pilar_repo.get_with_master(session, avaliacao.pilar_id)
+    if not pilar:
+        raise auth_service.AuthError("NOT_FOUND", "Pilar nao encontrado.", 404)
+
+    cancelled_ids = {
+        a.id
+        for a in pilar.actividades
+        if (a.status.value if hasattr(a.status, "value") else str(a.status))
+        == ActividadeStatus.cancelada.value
+    }
+    for row in payload.actividades:
+        if row.pilar_actividade_id in cancelled_ids:
+            raise auth_service.AuthError(
+                "VALIDATION_ERROR",
+                "Actividade cancelada nao pode receber dados.",
+                422,
+            )
+
+    for coll in (
+        list(avaliacao.actividades),
+        list(avaliacao.orcamentos),
+        list(avaliacao.riscos),
+        list(avaliacao.proximos_passos),
+    ):
+        for row in coll:
+            session.delete(row)
+    session.flush()
+
+    active_rows = [a for a in payload.actividades if a.pilar_actividade_id not in cancelled_ids]
+    if active_rows:
+        progresso = sum(a.pct_conclusao for a in active_rows) / len(active_rows)
+    else:
+        progresso = float(payload.progresso or 0)
+
+    data_sub = payload.data_sub or avaliacao.data_sub or date.today()
+    avaliacao.estado_geral = payload.estado_geral or ""
+    avaliacao.desafios = payload.desafios or ""
+    avaliacao.licoes = payload.licoes or ""
+    avaliacao.orc_obs = payload.orc_obs
+    avaliacao.recomendacoes = payload.recomendacoes
+    avaliacao.comentarios = payload.comentarios
+    avaliacao.progresso = float(progresso)
+    avaliacao.assinatura = payload.assinatura
+    avaliacao.data_sub = data_sub
+    if _status_val(avaliacao) == AvaliacaoStatus.reaberta.value:
+        avaliacao.status = AvaliacaoStatus.submetida
+
+    for row in payload.actividades:
+        pct = int(row.pct_conclusao)
+        session.add(
+            AvaliacaoActividade(
+                avaliacao_id=avaliacao.id,
+                pilar_actividade_id=row.pilar_actividade_id,
+                estado=_estado_from_pct(pct),
+                pct_conclusao=pct,
+                data_inicio_real=row.data_inicio_real,
+                data_fim_real=row.data_fim_real,
+                obs_execucao=row.obs_execucao,
+            )
+        )
+    for row in payload.orcamentos:
+        session.add(
+            AvaliacaoOrcamento(
+                avaliacao_id=avaliacao.id,
+                categoria_id=row.categoria_id,
+                valor_executado=row.valor_executado,
+                forma_execucao=row.forma_execucao,
+                obs=row.obs,
+            )
+        )
+    for row in payload.riscos:
+        session.add(
+            AvaliacaoRisco(
+                avaliacao_id=avaliacao.id,
+                risco_id=row.risco_id,
+                observacao=row.observacao,
+            )
+        )
+    for row in payload.proximos_passos:
+        if row.passo_id is None:
+            continue
+        session.add(
+            AvaliacaoProximoPasso(
+                avaliacao_id=avaliacao.id,
+                passo_id=row.passo_id,
+                alcancado=row.alcancado,
+                observacao=row.observacao,
+            )
+        )
+
+    session.flush()
+    return AvaliacaoCreated(
+        id=avaliacao.id,
+        pilar_id=avaliacao.pilar_id,
+        data_sub=data_sub,
+        progresso=float(avaliacao.progresso),
+        status=AvaliacaoStatus(_status_val(avaliacao)),
+        message="Avaliacao actualizada.",
+    )
+
+
+def validate_avaliacao(
+    session: Session, user: User, avaliacao_id: int, note: str | None = None
+) -> Avaliacao:
+    if not user_has_permission(session, user, "avaliacao.validate"):
+        role = user.role.value if hasattr(user.role, "value") else str(user.role)
+        if role != UserRole.admin.value:
+            raise auth_service.AuthError("FORBIDDEN", "Sem permissao para validar.", 403)
+    avaliacao = aval_repo.get_by_id(session, avaliacao_id)
+    if not avaliacao:
+        raise auth_service.AuthError("NOT_FOUND", "Avaliacao nao encontrada.", 404)
+    st = _status_val(avaliacao)
+    if st == AvaliacaoStatus.validada.value:
+        raise auth_service.AuthError("CONFLICT", "Avaliacao ja esta validada.", 409)
+    avaliacao.status = AvaliacaoStatus.validada
+    avaliacao.validated_by_id = user.id
+    avaliacao.validated_at = utcnow()
+    if note is not None:
+        avaliacao.validation_note = note
+    session.flush()
+    return avaliacao
+
+
+def reopen_avaliacao(
+    session: Session, user: User, avaliacao_id: int, note: str | None = None
+) -> Avaliacao:
+    if not user_has_permission(session, user, "avaliacao.validate"):
+        role = user.role.value if hasattr(user.role, "value") else str(user.role)
+        if role != UserRole.admin.value:
+            raise auth_service.AuthError("FORBIDDEN", "Sem permissao para reabrir.", 403)
+    avaliacao = aval_repo.get_by_id(session, avaliacao_id)
+    if not avaliacao:
+        raise auth_service.AuthError("NOT_FOUND", "Avaliacao nao encontrada.", 404)
+    if _status_val(avaliacao) != AvaliacaoStatus.validada.value:
+        raise auth_service.AuthError("CONFLICT", "So avaliacoes validadas podem ser reabertas.", 409)
+    avaliacao.status = AvaliacaoStatus.reaberta
+    avaliacao.reopened_by_id = user.id
+    avaliacao.reopened_at = utcnow()
+    if note is not None:
+        avaliacao.validation_note = note
+    session.flush()
+    return avaliacao
 
 
 def _update_schedule(pilar: Pilar, data_sub: date) -> None:

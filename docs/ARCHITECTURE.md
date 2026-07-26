@@ -73,7 +73,7 @@ Ficheiro com `source_type` + `source_id` (hoje: `avaliacao`) e `source_label` pa
 
 - Login: `POST /api/v1/auth/login` → cookie HttpOnly `access_token`.
 - Em producao o cookie leva flag `Secure`.
-- Dominio de email filtrado por `ALLOWED_EMAIL_DOMAIN` (default `gapi.co.mz`).
+- Dominio de email filtrado por `ALLOWED_EMAIL_DOMAIN` (virgula; vazio/`*`/`off` = sem restricao).
 - Perfis sistema: `admin` (`*`), `member`, `visitor`.
 - Permissoes em `app/rbac_catalog.py` — seed idempotente em cada boot.
 

@@ -16,8 +16,22 @@
     <div id="app-content" hidden>
       <section class="panel fade-in">
         <div class="panel-head">
-          <h3><i class="bi bi-folder2-open"></i> Projectos / Pilares</h3>
-          <p class="panel-hint">Dados mestre (objectivos, plano, orcamento, riscos) — cadastrados pela administracao.</p>
+          <div>
+            <h3><i class="bi bi-folder2-open"></i> Projectos / Pilares</h3>
+            <p class="panel-hint">Dados mestre (objectivos, plano, orcamento, riscos) — cadastrados pela administracao.</p>
+          </div>
+          <div class="row-actions" id="projectos-io" hidden>
+            <button type="button" class="btn btn-outline compact" id="btn-export-pilares">
+              <i class="bi bi-download"></i> Exportar
+            </button>
+            <button type="button" class="btn btn-outline compact" id="btn-template-pilares">
+              <i class="bi bi-file-earmark-spreadsheet"></i> Modelo
+            </button>
+            <label class="btn btn-outline compact">
+              <i class="bi bi-upload"></i> Importar
+              <input type="file" id="import-pilares-file" accept=".xlsx" hidden />
+            </label>
+          </div>
         </div>
         <div id="projectos-controls"></div>
         <div id="projectos-list" class="project-list">

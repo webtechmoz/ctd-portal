@@ -11,6 +11,7 @@ from app.models.avaliacao import (
 from app.models.enums import (
     ActividadeEstado,
     ActividadeStatus,
+    AvaliacaoStatus,
     Impacto,
     PilarStatus,
     Prioridade,
@@ -18,6 +19,7 @@ from app.models.enums import (
     UserRole,
     UserStatus,
 )
+from app.models.notification import Notification
 from app.models.pilar import (
     Pilar,
     PilarActividade,
@@ -53,10 +55,12 @@ __all__ = [
     "Impacto",
     "ActividadeEstado",
     "ActividadeStatus",
+    "AvaliacaoStatus",
     "Avaliacao",
     "AvaliacaoActividade",
     "AvaliacaoOrcamento",
     "AvaliacaoRisco",
     "AvaliacaoProximoPasso",
     "Anexo",
+    "Notification",
 ]

@@ -12,6 +12,7 @@ Cada rota HTML e um shell estatico. A logica vive em `js/pages/*.js` (ES modules
 | `/login` | `login.html` | `login.js` |
 | `/avaliacao` | `avaliacao.html` | `avaliacao.js` |
 | `/avaliacoes` | `avaliacoes.html` | `avaliacoes.js` |
+| `/relatorios` | `relatorios.html` | `relatorios.js` |
 | `/anexos` | `anexos.html` | `anexos.js` |
 | `/projectos` | `projectos.html` | `projectos.js` |
 | `/situacao` | `situacao.html` | `situacao.js` |

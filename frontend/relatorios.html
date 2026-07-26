@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Relatorios de avaliacao</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
+  <link rel="stylesheet" href="/css/app.css" />
+</head>
+<body>
+  <div id="app">
+    <div class="boot-loading loader-block">
+      <div class="spinner"></div>
+      <p>A preparar o portal...</p>
+    </div>
+    <div id="app-content" hidden>
+      <section class="home-hero fade-in">
+        <div>
+          <h2>Relatorios de avaliacao</h2>
+          <p>Filtre por projecto, periodo e estado de validacao. Exporte o resumo para Excel.</p>
+        </div>
+        <button type="button" class="btn btn-primary" id="btn-export">
+          <i class="bi bi-download"></i> Exportar Excel
+        </button>
+      </section>
+
+      <section class="panel fade-in delay-1">
+        <div class="panel-head">
+          <h3><i class="bi bi-funnel"></i> Filtros</h3>
+          <button type="button" class="btn btn-outline compact" id="btn-apply">
+            <i class="bi bi-check2"></i> Aplicar
+          </button>
+        </div>
+        <div class="report-filters" id="report-filters">
+          <label class="field">
+            <span>Projecto</span>
+            <select id="filter-pilar">
+              <option value="">Todos</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Status</span>
+            <select id="filter-status">
+              <option value="">Todos</option>
+              <option value="submetida">Submetida</option>
+              <option value="validada">Validada</option>
+              <option value="reaberta">Reaberta</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>De</span>
+            <input type="text" id="filter-from" placeholder="dd/mm/aaaa" autocomplete="off" />
+          </label>
+          <label class="field">
+            <span>Ate</span>
+            <input type="text" id="filter-to" placeholder="dd/mm/aaaa" autocomplete="off" />
+          </label>
+        </div>
+      </section>
+
+      <section class="panel fade-in delay-2">
+        <div class="panel-head">
+          <h3><i class="bi bi-table"></i> Resultados</h3>
+          <span class="ficha-count" id="report-count">0</span>
+        </div>
+        <div id="report-controls"></div>
+        <div id="report-list" class="report-table-wrap">
+          <div class="no-data compact"><i class="bi bi-hourglass-split"></i><p>A carregar...</p></div>
+        </div>
+      </section>
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  <script type="module" src="/js/pages/relatorios.js"></script>
+</body>
+</html>

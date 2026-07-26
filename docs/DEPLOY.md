@@ -23,7 +23,7 @@ Nao usar `python main.py` em producao (isso e o servidor de desenvolvimento do p
 | `R2_SECRET_ACCESS_KEY` | |
 | `R2_BUCKET` | ex. `ctd-portal` |
 
-Opcionais uteis: `JWT_TTL_HOURS`, `ALLOWED_EMAIL_DOMAIN`, `SEED_ADMIN_NAME`, `RESEND_*` (ainda nao usados no fluxo principal).
+Opcionais uteis: `JWT_TTL_HOURS`, `ALLOWED_EMAIL_DOMAIN` (vazio = qualquer dominio; lista com virgula), `SEED_ADMIN_NAME`, `RESEND_*`.
 
 ## O que o boot faz em producao
 

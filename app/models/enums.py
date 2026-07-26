@@ -56,6 +56,12 @@ class ActividadeStatus(str, enum.Enum):
     cancelada = "cancelada"
 
 
+class AvaliacaoStatus(str, enum.Enum):
+    submetida = "submetida"
+    validada = "validada"
+    reaberta = "reaberta"
+
+
 def utcnow() -> datetime:
     return datetime.now(timezone.utc)
 

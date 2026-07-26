@@ -8,7 +8,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from app.models.enums import ActividadeEstado
+from app.models.enums import ActividadeEstado, AvaliacaoStatus
 
 
 class AvaliacaoActividadeIn(BaseModel):
@@ -63,6 +63,7 @@ class AvaliacaoCreated(BaseModel):
     pilar_id: int
     data_sub: date | None = None
     progresso: float
+    status: AvaliacaoStatus = AvaliacaoStatus.submetida
     message: str = "Avaliacao submetida com sucesso."
 
 
@@ -74,6 +75,7 @@ class AvaliacaoListItem(BaseModel):
     progresso: float
     estado_geral: str = ""
     autor: str | None = None
+    status: AvaliacaoStatus = AvaliacaoStatus.submetida
 
 
 class AvaliacaoDetailOut(BaseModel):
@@ -83,8 +85,25 @@ class AvaliacaoDetailOut(BaseModel):
     data_sub: date | None = None
     progresso: float
     autor: str | None = None
+    status: AvaliacaoStatus = AvaliacaoStatus.submetida
+    validation_note: str | None = None
+    estado_geral: str = ""
+    desafios: str = ""
+    licoes: str = ""
+    orc_obs: str | None = None
+    recomendacoes: str | None = None
+    comentarios: str | None = None
+    assinatura: str | None = None
     actividades: list[dict] = Field(default_factory=list)
     orcamentos: list[dict] = Field(default_factory=list)
     riscos: list[dict] = Field(default_factory=list)
     proximos_passos: list[dict] = Field(default_factory=list)
     anexos: list[dict] = Field(default_factory=list)
+
+
+class AvaliacaoValidateIn(BaseModel):
+    validation_note: str | None = None
+
+
+class AvaliacaoReopenIn(BaseModel):
+    validation_note: str | None = None

@@ -104,10 +104,20 @@ Cada item inclui `source_label`, `source_url` (ex. `/avaliacoes?ver=…`), autor
 
 ## Dashboard / relatorios
 
-| Metodo | Path |
-|--------|------|
-| GET | `/pilares/{pilar_id}/dashboard` |
-| GET | `/reports/overview` |
+| Metodo | Path | Notas |
+|--------|------|-------|
+| GET | `/pilares/{pilar_id}/dashboard` | |
+| GET | `/reports/overview` | portefolio |
+| GET | `/reports/avaliacoes` | query: `pilar_id`, `status`, `from`, `to` |
+| GET | `/reports/avaliacoes/export.xlsx` | mesmos filtros |
+
+## Projectos Excel
+
+| Metodo | Path | Notas |
+|--------|------|-------|
+| GET | `/pilares/export.xlsx` | query opcional `ids=1,2` |
+| GET | `/pilares/import-template.xlsx` | modelo vazio |
+| POST | `/pilares/import` | multipart `file`; `?dry_run=1` |
 
 ---
 
@@ -125,4 +135,4 @@ Usar endpoints de anexos para ficheiros de avaliacao.
 
 `app/api/__init__.py` → `register_api_routes(app)` importa:
 
-`auth`, `users`, `roles`, `catalog`, `pilares`, `avaliacoes`, `anexos`, `dashboard`, `reports`, `uploads`.
+`auth`, `users`, `roles`, `catalog`, `pilares`, `avaliacoes`, `anexos`, `notifications`, `dashboard`, `reports`, `uploads`.

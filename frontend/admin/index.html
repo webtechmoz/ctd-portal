@@ -48,7 +48,19 @@
       <section class="panel fade-in" id="panel-projectos" hidden>
         <div class="panel-head">
           <h3><i class="bi bi-folder2"></i> Projectos</h3>
-          <a class="btn btn-primary compact" id="btn-new-pilar" href="/admin/projectos/novo"><i class="bi bi-plus-lg"></i> Novo projecto</a>
+          <div class="row-actions">
+            <button type="button" class="btn btn-outline compact" id="btn-export-pilares" title="Exportar Excel">
+              <i class="bi bi-download"></i> Exportar
+            </button>
+            <button type="button" class="btn btn-outline compact" id="btn-template-pilares" title="Baixar modelo">
+              <i class="bi bi-file-earmark-spreadsheet"></i> Modelo
+            </button>
+            <label class="btn btn-outline compact" id="btn-import-pilares" title="Importar Excel">
+              <i class="bi bi-upload"></i> Importar
+              <input type="file" id="import-pilares-file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden />
+            </label>
+            <a class="btn btn-primary compact" id="btn-new-pilar" href="/admin/projectos/novo"><i class="bi bi-plus-lg"></i> Novo projecto</a>
+          </div>
         </div>
         <div id="pilares-controls"></div>
         <div id="admin-pilares"></div>
@@ -85,8 +97,15 @@
                 <option value="inactive">inactive</option>
               </select>
             </label>
+            <label class="field full check-field" id="u_send_creds_field">
+              <input type="checkbox" id="u_send_credentials" />
+              <span>Enviar credenciais por email</span>
+            </label>
           </div>
           <p class="panel-hint" id="user-perm-hint" hidden style="margin-top:12px"></p>
+          <p class="panel-hint" id="u_reset_hint" hidden style="margin-top:8px">
+            Para redefinir a senha, preencha o campo Password (o utilizador sera obrigado a altera-la no proximo login).
+          </p>
         </div>
         <div class="modal-foot modal-foot-split">
           <div class="modal-foot-danger">

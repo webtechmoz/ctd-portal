@@ -76,6 +76,11 @@ def dashboard_page():
     return html_page("dashboard.html")
 
 
+@pw_app.route("/relatorios")
+def relatorios_page():
+    return html_page("relatorios.html")
+
+
 @pw_app.route("/admin")
 def admin_page():
     return html_page("admin/index.html")

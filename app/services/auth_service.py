@@ -38,9 +38,29 @@ def verify_password(plain: str, hashed: str) -> bool:
         return False
 
 
+def generate_temp_password(length: int = 12) -> str:
+    """Palavra-passe temporaria (sem caracteres ambiguos I/O/l/0/1)."""
+    import secrets
+    import string
+
+    upper = "ABCDEFGHJKLMNPQRSTUVWXYZ"
+    lower = "abcdefghijkmnopqrstuvwxyz"
+    digits = "23456789"
+    special = "!@#$"
+    alphabet = upper + lower + digits + special
+    picks = [
+        secrets.choice(upper),
+        secrets.choice(lower),
+        secrets.choice(digits),
+        secrets.choice(special),
+    ]
+    picks += [secrets.choice(alphabet) for _ in range(max(0, length - len(picks)))]
+    secrets.SystemRandom().shuffle(picks)
+    return "".join(picks)
+
+
 def _email_allowed(email: str) -> bool:
-    domain = settings.ALLOWED_EMAIL_DOMAIN.lower().lstrip("@")
-    return email.lower().endswith(f"@{domain}")
+    return settings.email_domain_allowed(email)
 
 
 def create_access_token(user: User) -> tuple[str, datetime]:
@@ -62,7 +82,12 @@ def decode_token(token: str) -> dict:
 def login(session: Session, email: str, password: str) -> tuple[User, str, datetime]:
     email_norm = email.strip().lower()
     if not _email_allowed(email_norm):
-        raise AuthError("INVALID_EMAIL_DOMAIN", "Email deve ser do dominio institucional.", 401)
+        allowed = ", ".join(settings.allowed_email_domains) or "(nenhum)"
+        raise AuthError(
+            "INVALID_EMAIL_DOMAIN",
+            f"Email fora dos dominios permitidos ({allowed}).",
+            401,
+        )
 
     user = user_repo.get_by_email(session, email_norm)
     if not user or not verify_password(password, user.password_hash):

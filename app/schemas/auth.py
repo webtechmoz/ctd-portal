@@ -21,6 +21,7 @@ class UserPublic(BaseModel):
     role_id: int | None = None
     perfil_nome: str | None = None
     profile_image_key: str | None = None
+    must_change_password: bool = False
     permissions: list[str] = []
 
     model_config = {"from_attributes": True}

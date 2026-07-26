@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Index, String, Text
+from sqlalchemy import DateTime, Enum, ForeignKey, Index, String, Text, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -37,6 +37,7 @@ class User(Base, TimestampMixin):
         nullable=False,
     )
     profile_image_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    must_change_password: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     perfil = relationship("Role", back_populates="users")
     pilares_responsavel = relationship(
@@ -44,7 +45,11 @@ class User(Base, TimestampMixin):
         back_populates="user",
         cascade="all, delete-orphan",
     )
-    avaliacoes = relationship("Avaliacao", back_populates="user")
+    avaliacoes = relationship(
+        "Avaliacao",
+        back_populates="user",
+        foreign_keys="Avaliacao.user_id",
+    )
 
 
 class TokenBlacklist(Base):

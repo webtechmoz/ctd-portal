@@ -1,5 +1,6 @@
 /** Base de projectos — cards com pesquisa e paginacao. */
-import { api } from "../api.js";
+import { api, apiDownload } from "../api.js";
+import { runProjectImport } from "../components/import-preview.js";
 import { filterByQuery, mountSearchPager, paginate } from "../components/list-kit.js";
 import { bootPage } from "../shell.js";
 import { setLoading, toast } from "../ui.js";
@@ -9,6 +10,41 @@ const { user } = await bootPage({
   title: "Base de projectos",
   subtitle: "Cadastro mestre dos pilares",
 });
+
+const canManage =
+  user?.role === "admin" || (user?.permissions || []).includes("projectos.manage");
+const ioBar = document.getElementById("projectos-io");
+if (canManage && ioBar) {
+  ioBar.hidden = false;
+  document.getElementById("btn-export-pilares")?.addEventListener("click", async () => {
+    try {
+      await apiDownload("/pilares/export.xlsx", "projectos-export.xlsx");
+      toast("Exportacao iniciada.", "success");
+    } catch (err) {
+      toast(err.message || "Erro ao exportar", "error");
+    }
+  });
+  document.getElementById("btn-template-pilares")?.addEventListener("click", async () => {
+    try {
+      await apiDownload("/pilares/import-template.xlsx", "projectos-modelo.xlsx");
+      toast("Modelo descarregado.", "success");
+    } catch (err) {
+      toast(err.message || "Erro", "error");
+    }
+  });
+  document.getElementById("import-pilares-file")?.addEventListener("change", async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    await runProjectImport(file, {
+      onSuccess: async () => {
+        const { pilares } = await api("/pilares");
+        allItems = pilares || [];
+        renderList();
+      },
+    });
+  });
+}
 
 function escapeHtml(str) {
   return String(str ?? "")
@@ -160,6 +196,8 @@ async function showDetail(id) {
               <div><dt>Fase</dt><dd>${escapeHtml(pilar.fase || "—")}</dd></div>
               <div><dt>Moeda</dt><dd>${escapeHtml(pilar.orc_moeda || "MZN")}</dd></div>
               <div><dt>Fonte</dt><dd>${escapeHtml(pilar.orc_fonte || "—")}</dd></div>
+              <div><dt>Desenvolvedor</dt><dd>${escapeHtml(pilar.desenvolvedor || "—")}</dd></div>
+              <div><dt>Responsavel</dt><dd>${escapeHtml(pilar.responsavel_nome || "—")}</dd></div>
             </dl>
             ${
               pilar.descricao

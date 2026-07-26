@@ -13,6 +13,7 @@ def register_api_routes(app) -> None:
         uploads,
         catalog,
         anexos,
+        notifications,
     )
 
     auth.register(app)
@@ -22,6 +23,7 @@ def register_api_routes(app) -> None:
     pilares.register(app)
     avaliacoes.register(app)
     anexos.register(app)
+    notifications.register(app)
     dashboard.register(app)
     reports.register(app)
     uploads.register(app)

@@ -65,6 +65,32 @@ export async function apiForm(path, formData, options = {}) {
   return data;
 }
 
+export async function apiDownload(path, filename) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    credentials: "include",
+  });
+  if (!res.ok) {
+    const ct = res.headers.get("content-type") || "";
+    if (ct.includes("application/json")) {
+      const data = await res.json().catch(() => ({}));
+      const err = new Error(data?.error?.message || res.statusText || "Erro no download");
+      err.status = res.status;
+      err.code = data?.error?.code;
+      throw err;
+    }
+    throw new Error(res.statusText || "Erro no download");
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename || "download.xlsx";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 export function formatBytes(n) {
   const v = Number(n) || 0;
   if (v < 1024) return `${v} B`;

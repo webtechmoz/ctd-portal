@@ -38,6 +38,7 @@ def create_user(
     email: str,
     password_hash: str,
     role: UserRole,
+    must_change_password: bool = True,
 ) -> User:
     user = User(
         name=name.strip(),
@@ -45,6 +46,7 @@ def create_user(
         password_hash=password_hash,
         role=role,
         status=UserStatus.active,
+        must_change_password=must_change_password,
     )
     session.add(user)
     session.flush()

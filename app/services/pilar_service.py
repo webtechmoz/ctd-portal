@@ -15,8 +15,10 @@ from app.models.pilar import (
     PilarObjectivo,
     PilarOrcamentoCategoria,
     PilarProximoPasso,
+    PilarResponsavel,
     PilarRisco,
 )
+from app.models.user import User
 from app.repositories import pilares as pilar_repo
 from app.schemas.pilar import PilarUpdate, PilarWrite
 from app.schemas.pilar_master import PilarMasterOut
@@ -31,11 +33,39 @@ _NESTED = {
     "delete_actividade_ids",
     "delete_categoria_ids",
     "delete_risco_ids",
+    "responsavel_user_id",
 }
 
 
 def _calc_proxima(periodicidade_dias: int) -> date:
     return date.today() + timedelta(days=max(1, periodicidade_dias or 90))
+
+
+def _set_responsavel(session: Session, pilar: Pilar, user_id: int | None) -> None:
+    pilar.responsaveis.clear()
+    session.flush()
+    if not user_id:
+        return
+    user = session.get(User, user_id)
+    if not user:
+        raise auth_service.AuthError("VALIDATION_ERROR", "Responsavel invalido.", 422)
+    pilar.responsaveis.append(PilarResponsavel(user_id=user.id))
+
+
+def _master_out(session: Session, pilar: Pilar) -> PilarMasterOut:
+    data = PilarMasterOut.model_validate(pilar)
+    link = pilar.responsaveis[0] if pilar.responsaveis else None
+    if link:
+        data.responsavel_user_id = link.user_id
+        user = link.user or session.get(User, link.user_id)
+        if user:
+            data.responsavel_nome = user.name
+            data.responsavel_email = user.email
+    return data
+
+
+def master_out(session: Session, pilar: Pilar) -> PilarMasterOut:
+    return _master_out(session, pilar)
 
 
 def _set_nested_create(pilar: Pilar, data: PilarWrite) -> None:
@@ -263,6 +293,7 @@ def create_pilar(session: Session, data: PilarWrite) -> PilarMasterOut:
             "orcamento_categorias",
             "riscos",
             "proximos_passos",
+            "responsavel_user_id",
         }
     )
     payload["nome"] = data.nome.strip()
@@ -272,11 +303,12 @@ def create_pilar(session: Session, data: PilarWrite) -> PilarMasterOut:
     session.add(pilar)
     session.flush()
     _set_nested_create(pilar, data)
+    _set_responsavel(session, pilar, data.responsavel_user_id)
     session.flush()
     _sync_orc_aprovado(pilar)
     session.flush()
     refreshed = pilar_repo.get_with_master(session, pilar.id)
-    return PilarMasterOut.model_validate(refreshed)
+    return _master_out(session, refreshed)
 
 
 def update_pilar(session: Session, pilar_id: int, data: PilarUpdate) -> PilarMasterOut:
@@ -303,11 +335,13 @@ def update_pilar(session: Session, pilar_id: int, data: PilarUpdate) -> PilarMas
     _apply_deletes(session, pilar, data)
     session.flush()
     _append_nested(pilar, data)
+    if "responsavel_user_id" in data.model_fields_set:
+        _set_responsavel(session, pilar, data.responsavel_user_id)
     session.flush()
     _sync_orc_aprovado(pilar)
     session.flush()
     refreshed = pilar_repo.get_with_master(session, pilar.id)
-    return PilarMasterOut.model_validate(refreshed)
+    return _master_out(session, refreshed)
 
 
 def delete_pilar(session: Session, pilar_id: int) -> None:

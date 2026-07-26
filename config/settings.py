@@ -48,7 +48,9 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "change-me"
     JWT_TTL_HOURS: int = 8
     CORS_ORIGINS: str = "http://localhost:8800"
-    ALLOWED_EMAIL_DOMAIN: str = "gapi.co.mz"
+    ALLOWED_EMAIL_DOMAIN: str = ""
+    # Dominios permitidos (virgula). Vazio / * / any / off = sem restricao.
+    # Ex.: gapi.co.mz  ou  gapi.co.mz,parceiro.mz
 
     # Local MySQL (discrete fields — preferred in APP_ENV=local)
     MYSQL_HOST: str = "127.0.0.1"
@@ -128,6 +130,21 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
+
+    @property
+    def allowed_email_domains(self) -> list[str]:
+        """Lista de dominios permitidos. Vazia = sem restricao de dominio."""
+        raw = (self.ALLOWED_EMAIL_DOMAIN or "").strip().lower()
+        if not raw or raw in {"*", "any", "off", "false", "none"}:
+            return []
+        return [d.strip().lstrip("@") for d in raw.split(",") if d.strip()]
+
+    def email_domain_allowed(self, email: str) -> bool:
+        domains = self.allowed_email_domains
+        if not domains:
+            return True
+        email_norm = (email or "").strip().lower()
+        return any(email_norm.endswith(f"@{d}") for d in domains)
 
     @property
     def uses_mysql(self) -> bool:

@@ -35,6 +35,7 @@ class PilarDetail(BaseModel):
     beneficios: str
     plano_obs: str | None = None
     parceiros: str | None = None
+    desenvolvedor: str | None = None
     orc_aprovado: Decimal | None = None
     orc_moeda: str
     orc_fonte: str | None = None
@@ -99,6 +100,8 @@ class PilarWrite(BaseModel):
     beneficios: str = ""
     plano_obs: str | None = None
     parceiros: str | None = None
+    desenvolvedor: str | None = None
+    responsavel_user_id: int | None = None
     orc_aprovado: Decimal | None = None
     orc_moeda: str = "MZN"
     orc_fonte: str | None = None
@@ -126,6 +129,8 @@ class PilarUpdate(BaseModel):
     beneficios: str | None = None
     plano_obs: str | None = None
     parceiros: str | None = None
+    desenvolvedor: str | None = None
+    responsavel_user_id: int | None = None
     orc_aprovado: Decimal | None = None
     orc_moeda: str | None = None
     orc_fonte: str | None = None

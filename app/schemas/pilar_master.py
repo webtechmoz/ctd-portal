@@ -60,9 +60,19 @@ class PassoOut(BaseModel):
     ordem: int
 
 
+class ResponsavelOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    user_id: int
+    name: str | None = None
+    email: str | None = None
+
+
 class PilarMasterOut(PilarDetail):
     objectivos: list[ObjectivoOut] = Field(default_factory=list)
     actividades: list[ActividadeOut] = Field(default_factory=list)
     orcamento_categorias: list[OrcamentoCatOut] = Field(default_factory=list)
     riscos: list[RiscoOut] = Field(default_factory=list)
     proximos_passos: list[PassoOut] = Field(default_factory=list)
+    responsavel_user_id: int | None = None
+    responsavel_nome: str | None = None
+    responsavel_email: str | None = None

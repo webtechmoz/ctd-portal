@@ -5,11 +5,14 @@ import { filterByQuery, mountSearchPager, paginate } from "../components/list-ki
 import { bootPage } from "../shell.js";
 import { setLoading, toast } from "../ui.js";
 
-await bootPage({
+const { user } = await bootPage({
   page: "avaliacoes",
   title: "Avaliacoes",
   subtitle: "Arquivo e consulta",
 });
+
+const canValidate =
+  user?.role === "admin" || (user?.permissions || []).includes("avaliacao.validate");
 
 function escapeHtml(str) {
   return String(str ?? "")
@@ -63,6 +66,7 @@ function renderList() {
           <th>Data</th>
           <th>Projecto</th>
           <th>Progresso</th>
+          <th>Estado</th>
           <th>Autor</th>
           <th></th>
         </tr>
@@ -75,6 +79,7 @@ function renderList() {
             <td>${escapeHtml(r.data_sub || "—")}</td>
             <td><strong>${escapeHtml(r.pilar_nome)}</strong></td>
             <td><span class="status-pill ok">${Number(r.progresso || 0).toFixed(0)}%</span></td>
+            <td><span class="status-pill ${r.status === "validada" ? "ok" : r.status === "reaberta" ? "warn" : "neutro"}">${escapeHtml(r.status || "submetida")}</span></td>
             <td>${escapeHtml(r.autor || "—")}</td>
             <td><button type="button" class="btn btn-outline compact" data-ver="${r.id}">Ver</button></td>
           </tr>`
@@ -150,12 +155,29 @@ async function openDetail(id) {
           <div>
             <p class="aval-detail-eyebrow">Acompanhamento de execucao</p>
             <h4>${escapeHtml(a.pilar_nome)}</h4>
-            <p class="aval-detail-meta">Submetida em ${escapeHtml(a.data_sub || "—")} · ${escapeHtml(a.autor || "—")}</p>
+            <p class="aval-detail-meta">Submetida em ${escapeHtml(a.data_sub || "—")} · ${escapeHtml(a.autor || "—")} · <span class="status-pill ${a.status === "validada" ? "ok" : a.status === "reaberta" ? "warn" : "neutro"}">${escapeHtml(a.status || "submetida")}</span></p>
           </div>
           <div class="aval-detail-progress">
             <span>Progresso</span>
             <strong>${Number(a.progresso || 0).toFixed(0)}%</strong>
             <div class="progress-bar-wrap compact"><div class="progress-bar" style="width:${Math.min(100, Number(a.progresso || 0))}%"></div></div>
+            <div class="row-actions" style="margin-top:10px">
+              ${
+                canValidate && a.status !== "validada"
+                  ? `<button type="button" class="btn btn-primary compact" id="btn-validate-aval"><i class="bi bi-check2-circle"></i> Validar</button>`
+                  : ""
+              }
+              ${
+                canValidate && a.status === "validada"
+                  ? `<button type="button" class="btn btn-outline compact" id="btn-reopen-aval"><i class="bi bi-unlock"></i> Reabrir</button>`
+                  : ""
+              }
+              ${
+                a.status !== "validada"
+                  ? `<a class="btn btn-outline compact" href="/avaliacao?pilar=${a.pilar_id}&edit=${a.id}"><i class="bi bi-pencil"></i> Editar</a>`
+                  : ""
+              }
+            </div>
           </div>
         </div>
 
@@ -267,6 +289,33 @@ async function openDetail(id) {
           <a class="btn btn-outline compact" href="/anexos?q=${encodeURIComponent(a.pilar_nome || "")}">Ver anexos</a>
         </div>
       </div>`;
+
+    detailBody.querySelector("#btn-validate-aval")?.addEventListener("click", async () => {
+      if (!confirm("Validar esta avaliacao? Deixa de ser editavel.")) return;
+      try {
+        await api(`/avaliacoes/${id}/validate`, { method: "POST", body: "{}" });
+        toast("Avaliacao validada.", "success");
+        const { avaliacoes } = await api("/avaliacoes");
+        allRows = avaliacoes || [];
+        renderList();
+        openDetail(id);
+      } catch (err) {
+        toast(err.message || "Erro", "error");
+      }
+    });
+    detailBody.querySelector("#btn-reopen-aval")?.addEventListener("click", async () => {
+      if (!confirm("Reabrir esta avaliacao para edicao?")) return;
+      try {
+        await api(`/avaliacoes/${id}/reopen`, { method: "POST", body: "{}" });
+        toast("Avaliacao reaberta.", "success");
+        const { avaliacoes } = await api("/avaliacoes");
+        allRows = avaliacoes || [];
+        renderList();
+        openDetail(id);
+      } catch (err) {
+        toast(err.message || "Erro", "error");
+      }
+    });
   } catch (err) {
     toast(err.message || "Erro", "error");
     detailBody.innerHTML = `<div class="no-data compact"><p>${escapeHtml(err.message)}</p></div>`;

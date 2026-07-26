@@ -237,6 +237,7 @@ def run_seed(*, force_admin: bool = False, sample_data: bool | None = None) -> N
                     password_hash=hash_password(admin_password),
                     role=UserRole.admin,
                     status=UserStatus.active,
+                    must_change_password=False,
                 )
                 session.add(admin)
                 session.flush()

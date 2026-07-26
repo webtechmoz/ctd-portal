@@ -18,7 +18,7 @@
     <div class="page-form fade-in">
       <div class="page-form-top">
         <div class="page-form-heading">
-          <a class="btn btn-outline compact" href="/admin#projectos"><i class="bi bi-arrow-left"></i> Voltar</a>
+          <a class="btn btn-outline compact" href="/admin?panel=projectos#projectos"><i class="bi bi-arrow-left"></i> Voltar</a>
           <div class="page-form-titles">
             <h2 id="pilar-page-title">Novo projecto</h2>
             <p class="page-form-lead" id="pilar-hint">Preencha as secções abaixo. Pode adicionar actividades, rubricas e riscos antes de guardar.</p>
@@ -41,12 +41,14 @@
             <label class="field full"><span>Nome</span><input id="p_nome" required maxlength="150" placeholder="Nome do projecto" /></label>
             <label class="field"><span>Area</span><select id="p_area"></select></label>
             <label class="field"><span>Fase</span><select id="p_fase"></select></label>
-            <label class="field"><span>Status</span>
+            <label class="field"><span>Estado</span>
               <select id="p_status">
                 <option value="activo">activo</option>
                 <option value="inactivo">inactivo</option>
               </select>
             </label>
+            <label class="field"><span>Desenvolvedor</span><input id="p_desenvolvedor" maxlength="255" placeholder="Equipa / fornecedor" /></label>
+            <label class="field"><span>Responsavel (membro)</span><select id="p_responsavel"><option value="">—</option></select></label>
           </div>
         </section>
 
@@ -142,7 +144,7 @@
           </div>
           <div class="modal-foot-main">
             <button type="submit" class="btn btn-primary" id="btn-save-pilar">Guardar</button>
-            <a class="btn btn-outline" href="/admin#projectos">Cancelar</a>
+            <a class="btn btn-outline" href="/admin?panel=projectos#projectos">Cancelar</a>
           </div>
         </div>
       </form>

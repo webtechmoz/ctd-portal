@@ -10,15 +10,27 @@ from app.models.pilar import Pilar
 
 
 def get_latest_for_pilar(session: Session, pilar_id: int) -> Avaliacao | None:
+    from app.models.enums import AvaliacaoStatus
+
+    opts = (
+        selectinload(Avaliacao.actividades),
+        selectinload(Avaliacao.orcamentos),
+        selectinload(Avaliacao.riscos),
+        selectinload(Avaliacao.proximos_passos),
+    )
+    validated = session.scalar(
+        select(Avaliacao)
+        .where(Avaliacao.pilar_id == pilar_id, Avaliacao.status == AvaliacaoStatus.validada)
+        .options(*opts)
+        .order_by(Avaliacao.data_sub.desc(), Avaliacao.id.desc())
+        .limit(1)
+    )
+    if validated:
+        return validated
     return session.scalar(
         select(Avaliacao)
         .where(Avaliacao.pilar_id == pilar_id)
-        .options(
-            selectinload(Avaliacao.actividades),
-            selectinload(Avaliacao.orcamentos),
-            selectinload(Avaliacao.riscos),
-            selectinload(Avaliacao.proximos_passos),
-        )
+        .options(*opts)
         .order_by(Avaliacao.data_sub.desc(), Avaliacao.id.desc())
         .limit(1)
     )

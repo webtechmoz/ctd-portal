@@ -1,6 +1,7 @@
 /** Admin — utilizadores, perfis, projectos (modais), listas de sistema. */
-import { api } from "../api.js";
+import { api, apiDownload } from "../api.js";
 import { filterByQuery, mountSearchPager, paginate } from "../components/list-kit.js";
+import { runProjectImport } from "../components/import-preview.js";
 import { bindModalDismiss, closeModal, openModal } from "../components/modal.js";
 import { enhanceSelect } from "../components/styled-select.js";
 import { bootPage } from "../shell.js";
@@ -81,24 +82,40 @@ optsBtn?.addEventListener("click", (e) => {
 });
 document.addEventListener("click", () => optsMenu.classList.remove("open"));
 
-optsMenu?.querySelectorAll("button").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    const key = btn.dataset.panel;
-    optsMenu.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b === btn));
-    Object.entries(panels).forEach(([k, el]) => {
-      el.hidden = k !== key;
-    });
-    optsMenu.classList.remove("open");
+function showPanel(key, { persist = true } = {}) {
+  if (!panels[key]) key = "users";
+  optsMenu?.querySelectorAll("button").forEach((b) => {
+    b.classList.toggle("active", b.dataset.panel === key);
   });
+  Object.entries(panels).forEach(([k, el]) => {
+    if (el) el.hidden = k !== key;
+  });
+  optsMenu?.classList.remove("open");
+  if (persist) {
+    sessionStorage.setItem("admin_panel", key);
+    const url = `${window.location.pathname}?panel=${encodeURIComponent(key)}#${key}`;
+    history.replaceState(null, "", url);
+  }
+}
+
+optsMenu?.querySelectorAll("button").forEach((btn) => {
+  btn.addEventListener("click", () => showPanel(btn.dataset.panel || "users"));
 });
 
-function showPanel(key) {
-  optsMenu?.querySelector(`button[data-panel="${key}"]`)?.click();
+function initialAdminPanel() {
+  const params = new URLSearchParams(window.location.search);
+  const fromQuery = params.get("panel");
+  const fromHash = (window.location.hash || "").replace(/^#/, "");
+  const fromStore = sessionStorage.getItem("admin_panel");
+  const key = fromQuery || fromHash || fromStore || "users";
+  return panels[key] ? key : "users";
 }
-if (window.location.hash === "#projectos") showPanel("projectos");
-else if (window.location.hash === "#roles") showPanel("roles");
-else if (window.location.hash === "#catalog") showPanel("catalog");
 
+showPanel(initialAdminPanel());
+window.addEventListener("hashchange", () => {
+  const key = (window.location.hash || "").replace(/^#/, "");
+  if (panels[key]) showPanel(key);
+});
 [
   "modal-user",
   "modal-role",
@@ -170,12 +187,15 @@ function openUserModal(user = null) {
     document.getElementById("u_name").value = user.name || "";
     emailInput.value = user.email || "";
     emailInput.readOnly = true;
-    document.getElementById("u_password_field").hidden = true;
+    document.getElementById("u_password_field").hidden = false;
     pwInput.required = false;
     pwInput.value = "";
+    pwLabel.textContent = "Nova password (opcional)";
     statusField.hidden = false;
     document.getElementById("u_status").value = user.status || "active";
     reEnhance(document.getElementById("u_status"));
+    document.getElementById("u_send_credentials").checked = false;
+    document.getElementById("u_reset_hint").hidden = false;
     const roleId =
       user.role_id ||
       rolesCache.find((r) => r.slug === user.role)?.id ||
@@ -189,22 +209,46 @@ function openUserModal(user = null) {
       : "Seleccione um perfil para gerir permissoes.";
     permsBtn.hidden = !(canManageRoles() && role);
     permsBtn.dataset.roleId = role ? String(role.id) : "";
+    syncPasswordOptional();
   } else {
     title.textContent = "Novo utilizador";
     saveBtn.textContent = "Criar";
     emailInput.readOnly = false;
     document.getElementById("u_password_field").hidden = false;
-    pwInput.required = true;
-    pwLabel.textContent = "Password";
     statusField.hidden = true;
     permHint.hidden = true;
     permsBtn.hidden = true;
     permsBtn.dataset.roleId = "";
+    document.getElementById("u_send_credentials").checked = true;
+    document.getElementById("u_reset_hint").hidden = true;
+    syncPasswordOptional();
   }
 
   reEnhance(roleSelect);
   openModal(document.getElementById("modal-user"));
 }
+
+function syncPasswordOptional() {
+  const pwInput = document.getElementById("u_password");
+  const pwLabel = document.getElementById("u_password_label");
+  const send = document.getElementById("u_send_credentials")?.checked;
+  const editId = document.getElementById("u_edit_id")?.value;
+  if (!pwInput || !pwLabel) return;
+  if (editId) {
+    pwInput.required = false;
+    pwLabel.textContent = "Nova password (opcional)";
+    return;
+  }
+  if (send) {
+    pwInput.required = false;
+    pwLabel.textContent = "Password (opcional — gerada se vazio)";
+  } else {
+    pwInput.required = true;
+    pwLabel.textContent = "Password";
+  }
+}
+
+document.getElementById("u_send_credentials")?.addEventListener("change", syncPasswordOptional);
 
 document.getElementById("btn-new-user")?.addEventListener("click", () => openUserModal(null));
 
@@ -296,7 +340,8 @@ function renderUsers() {
               <div class="row-actions">
                 ${
                   canManageUsers()
-                    ? `<button type="button" class="icon-btn compact" data-edit-user="${u.id}" title="Editar utilizador" aria-label="Editar utilizador"><i class="bi bi-pencil"></i></button>`
+                    ? `<button type="button" class="icon-btn compact" data-edit-user="${u.id}" title="Editar utilizador" aria-label="Editar utilizador"><i class="bi bi-pencil"></i></button>
+                       <button type="button" class="icon-btn compact" data-send-creds="${u.id}" title="Redefinir e enviar credenciais" aria-label="Enviar credenciais"><i class="bi bi-envelope-at"></i></button>`
                     : ""
                 }
                 ${
@@ -357,6 +402,36 @@ function renderUsers() {
       if (u) openUserModal(u);
     });
   });
+  usersList.querySelectorAll("[data-send-creds]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const u = usersCache.find((x) => x.id === Number(btn.dataset.sendCreds));
+      if (!u) return;
+      if (
+        !window.confirm(
+          `Redefinir a palavra-passe de «${u.name}» e enviar as novas credenciais por email?`
+        )
+      ) {
+        return;
+      }
+      btn.disabled = true;
+      try {
+        const res = await api(`/users/${u.id}/send-credentials`, {
+          method: "POST",
+          body: "{}",
+        });
+        toast(
+          res.credentials_email_sent
+            ? "Credenciais redefinidas e enviadas por email."
+            : "Credenciais redefinidas (email nao enviado — verifique Resend).",
+          res.credentials_email_sent ? "success" : "error"
+        );
+      } catch (err) {
+        toast(err.message || "Erro ao enviar credenciais", "error");
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  });
   usersList.querySelectorAll("[data-edit-user-perms]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const u = usersCache.find((x) => x.id === Number(btn.dataset.editUserPerms));
@@ -376,31 +451,57 @@ userForm?.addEventListener("submit", async (e) => {
   const name = document.getElementById("u_name").value.trim();
   const roleId = Number(document.getElementById("u_role_id").value);
   const password = document.getElementById("u_password").value;
+  const sendCredentials = document.getElementById("u_send_credentials").checked;
   try {
     if (editId) {
-      await api(`/users/${editId}`, {
+      const body = {
+        name,
+        role_id: roleId,
+        status: document.getElementById("u_status").value,
+      };
+      if (password) {
+        if (password.length < 8) {
+          return toast("Password deve ter pelo menos 8 caracteres.", "error");
+        }
+        body.password = password;
+        body.send_credentials = sendCredentials;
+      }
+      const res = await api(`/users/${editId}`, {
         method: "PATCH",
-        body: JSON.stringify({
-          name,
-          role_id: roleId,
-          status: document.getElementById("u_status").value,
-        }),
+        body: JSON.stringify(body),
       });
-      toast("Utilizador actualizado.", "success");
+      toast(
+        password && res.credentials_email_sent
+          ? "Utilizador actualizado. Credenciais enviadas."
+          : "Utilizador actualizado.",
+        "success"
+      );
     } else {
-      if (!password || password.length < 8) {
+      if (!sendCredentials && (!password || password.length < 8)) {
+        return toast("Password obrigatoria (min. 8) ou active o envio de credenciais.", "error");
+      }
+      if (password && password.length < 8) {
         return toast("Password deve ter pelo menos 8 caracteres.", "error");
       }
-      await api("/users", {
+      const body = {
+        name,
+        email: document.getElementById("u_email").value,
+        role_id: roleId,
+        send_credentials: sendCredentials,
+      };
+      if (password) body.password = password;
+      const res = await api("/users", {
         method: "POST",
-        body: JSON.stringify({
-          name,
-          email: document.getElementById("u_email").value,
-          password,
-          role_id: roleId,
-        }),
+        body: JSON.stringify(body),
       });
-      toast("Utilizador criado.", "success");
+      toast(
+        sendCredentials && res.credentials_email_sent
+          ? "Utilizador criado. Credenciais enviadas por email."
+          : sendCredentials
+            ? "Utilizador criado (email nao enviado — verifique Resend)."
+            : "Utilizador criado.",
+        "success"
+      );
     }
     closeModal(document.getElementById("modal-user"));
     loadUsers();
@@ -550,6 +651,31 @@ async function loadPilares() {
     adminPilares.innerHTML = `<div class="no-data compact"><p>${escapeHtml(err.message)}</p></div>`;
   }
 }
+
+document.getElementById("btn-export-pilares")?.addEventListener("click", async () => {
+  try {
+    await apiDownload("/pilares/export.xlsx", "projectos-export.xlsx");
+    toast("Exportacao iniciada.", "success");
+  } catch (err) {
+    toast(err.message || "Erro ao exportar", "error");
+  }
+});
+
+document.getElementById("btn-template-pilares")?.addEventListener("click", async () => {
+  try {
+    await apiDownload("/pilares/import-template.xlsx", "projectos-modelo.xlsx");
+    toast("Modelo descarregado.", "success");
+  } catch (err) {
+    toast(err.message || "Erro", "error");
+  }
+});
+
+document.getElementById("import-pilares-file")?.addEventListener("change", async (e) => {
+  const file = e.target.files?.[0];
+  e.target.value = "";
+  if (!file) return;
+  await runProjectImport(file, { onSuccess: () => loadPilares() });
+});
 
 function renderPilares() {
   const filtered = filterByQuery(pilaresCache, pilaresPager.query, (p) => [

@@ -105,6 +105,7 @@ def register(app):
                         app, 400, "INVALID_PASSWORD", "Palavra-passe actual incorrecta."
                     )
                 ctx.user.password_hash = auth_service.hash_password(data.new_password)
+                ctx.user.must_change_password = False
                 session.add(ctx.user)
                 return api_json(
                     app,
