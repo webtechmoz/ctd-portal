@@ -145,6 +145,8 @@ def _detail(row, session=None) -> dict:
                 "prazo": passo_map[p.passo_id].prazo if p.passo_id in passo_map else None,
                 "alcancado": p.alcancado,
                 "observacao": p.observacao,
+                "criado_nesta_avaliacao": bool(getattr(p, "criado_nesta_avaliacao", False)),
+                "removivel": bool(getattr(p, "criado_nesta_avaliacao", False)),
             }
             for p in row.proximos_passos
         ],

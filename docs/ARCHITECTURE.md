@@ -61,9 +61,11 @@ Snapshot periodico de execucao sobre um pilar:
 
 - % e estado das actividades (derivados)
 - orcamento executado cumulativo
-- proximos passos (cumulativos / concluidos)
+- proximos passos (cumulativos / concluidos); flag `criado_nesta_avaliacao` nos criados com **+ Adicionar**
 - observacoes de riscos
 - anexos do periodo
+
+Pode ser criada (`POST`) ou actualizada (`PATCH`) enquanto `submetida` / `reaberta`. Validacao e reabertura via endpoints dedicados.
 
 ### Anexo
 

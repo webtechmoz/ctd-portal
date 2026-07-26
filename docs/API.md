@@ -75,18 +75,34 @@ Payload de create/update inclui nested: objectivos, actividades, orcamento_categ
 | Metodo | Path | Notas |
 |--------|------|-------|
 | GET | `/avaliacoes` | arquivo (lista) |
-| POST | `/avaliacoes` | submeter periodo |
+| POST | `/avaliacoes` | submeter periodo (nova) |
 | GET | `/avaliacoes/{id}` | detalhe (actividades, orcamento, riscos, passos, anexos) |
+| PATCH | `/avaliacoes/{id}` | actualizar avaliacao editavel (`submetida` / `reaberta`) |
 | GET | `/avaliacoes/latest/{pilar_id}` | baseline da avaliacao anterior |
+| POST | `/avaliacoes/{id}/validate` | validar (coordenador / permissao) |
+| POST | `/avaliacoes/{id}/reopen` | reabrir para edicao |
 | POST | `/avaliacoes/{id}/anexos` | multipart `files` (varios) |
 
-### Regras no create (servidor)
+### Detalhe de proximos passos
+
+Cada item em `proximos_passos` inclui, entre outros:
+
+| Campo | Significado |
+|-------|-------------|
+| `passo_id` | FK ao passo master do pilar |
+| `alcancado` | marcado como concluido neste periodo |
+| `criado_nesta_avaliacao` | `true` se foi criado com **+ Adicionar** nesta avaliacao |
+| `removivel` | alias de `criado_nesta_avaliacao` — a UI usa para mostrar o botao apagar |
+
+### Regras no create / update (servidor)
 
 - `%` de actividade nao pode ser inferior a da avaliacao anterior.
 - Valor orcamental executado e **cumulativo** e nao pode descer relativamente ao anterior.
 - Estado da actividade derivado da %: `0` pendente, `<100` em_progresso, `100` concluida.
-- Progresso global = media das %.
-- Proximos passos novos sem `passo_id` criam registo master no pilar.
+- Progresso global = media das % das actividades activas.
+- Proximos passos novos sem `passo_id` criam registo master no pilar e ficam com `criado_nesta_avaliacao=true`.
+- No **PATCH**, passos omitidos que tinham `criado_nesta_avaliacao=true` sao removidos do master se nao tiverem outras ligacoes.
+- Avaliacao **validada** nao e editavel ate `reopen`.
 
 ---
 

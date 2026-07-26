@@ -17,6 +17,9 @@ const empty = document.getElementById("aval-empty");
 
 let currentPilar = null;
 let previousAval = null;
+/** Avaliacao em edicao (quando ?edit=) */
+let editingAval = null;
+let editingAvalId = null;
 let picker = null;
 /** @type {File[]} */
 let pendingAnexos = [];
@@ -87,6 +90,30 @@ function prevAct(actId) {
 
 function prevOrc(catId) {
   return (previousAval?.orcamentos || []).find((o) => o.categoria_id === catId) || null;
+}
+
+function editAct(actId) {
+  return (editingAval?.actividades || []).find((a) => a.pilar_actividade_id === actId) || null;
+}
+
+function editOrc(catId) {
+  return (editingAval?.orcamentos || []).find((o) => o.categoria_id === catId) || null;
+}
+
+function setEditChrome(isEdit) {
+  const title = document.querySelector(".dash-topbar h2");
+  if (title) {
+    title.innerHTML = isEdit
+      ? '<i class="bi bi-pencil-square"></i> Editar avaliacao'
+      : '<i class="bi bi-clipboard2-check"></i> Acompanhamento de execucao';
+  }
+  document.title = isEdit ? "Editar avaliacao" : "Nova avaliacao";
+  const submitBtn = document.getElementById("btn_submit");
+  if (submitBtn && !submitBtn.disabled) {
+    submitBtn.innerHTML = isEdit
+      ? '<i class="bi bi-send"></i> Actualizar avaliacao'
+      : '<i class="bi bi-send"></i> Submeter avaliacao';
+  }
 }
 
 function setDateInput(el, iso) {
@@ -256,6 +283,7 @@ function snapshotPassosFromDom() {
     responsavel: el.querySelector(".passo-resp")?.value || "",
     prazo: el.querySelector(".passo-prazo")?.value || "",
     alcancado: Boolean(el.querySelector(".passo-alcancado")?.checked),
+    removivel: el.dataset.removivel === "1" || !el.dataset.passoId,
   }));
 }
 
@@ -288,13 +316,14 @@ function renderPassosFromRows(rows) {
         <span></span>
       </div>
       ${rows
-        .map(
-          (p) => `
+        .map((p) => {
+          const removivel = Boolean(p.removivel) || !p.passo_id;
+          return `
         <div class="passo-item" data-key="${escapeHtml(p.key)}" ${
             p.passo_id ? `data-passo-id="${p.passo_id}"` : ""
-          }>
+          } data-removivel="${removivel ? "1" : "0"}">
           <input class="passo-desc" type="text" value="${escapeHtml(p.descricao)}" placeholder="Descricao da acao" ${
-            p.passo_id ? "readonly" : ""
+            p.passo_id && !removivel ? "readonly" : ""
           } />
           <input class="passo-resp" type="text" value="${escapeHtml(p.responsavel)}" placeholder="Responsavel" />
           <input class="passo-prazo" type="text" value="${escapeHtml(p.prazo || "")}" placeholder="Seleccione a data" />
@@ -304,15 +333,15 @@ function renderPassosFromRows(rows) {
           </label>
           <div class="passo-actions">
             ${
-              p.passo_id
-                ? ""
-                : `<button type="button" class="icon-btn compact danger" data-remove-passo="${escapeHtml(
+              removivel
+                ? `<button type="button" class="icon-btn compact danger" data-remove-passo="${escapeHtml(
                     p.key
                   )}" title="Remover"><i class="bi bi-trash"></i></button>`
+                : ""
             }
           </div>
-        </div>`
-        )
+        </div>`;
+        })
         .join("")}
     </div>`;
 
@@ -326,6 +355,20 @@ function renderPassosFromRows(rows) {
 }
 
 function seedPassos(pilar) {
+  if (editingAval) {
+    const rows = (editingAval.proximos_passos || []).map((p) => ({
+      key: `e-${p.passo_id || Math.random()}`,
+      passo_id: p.passo_id,
+      descricao: p.descricao || "",
+      responsavel: p.responsavel || "",
+      prazo: p.prazo || "",
+      alcancado: Boolean(p.alcancado),
+      removivel: Boolean(p.removivel || p.criado_nesta_avaliacao),
+    }));
+    renderPassosFromRows(rows);
+    return;
+  }
+
   const doneIds = new Set(
     (previousAval?.proximos_passos || []).filter((p) => p.alcancado).map((p) => p.passo_id)
   );
@@ -339,6 +382,7 @@ function seedPassos(pilar) {
       responsavel: p.responsavel || "",
       prazo: p.prazo || "",
       alcancado: false,
+      removivel: false,
     }));
 
   renderPassosFromRows(openMaster);
@@ -400,6 +444,9 @@ function renderRisks(pilar) {
     host.innerHTML = `<p class="empty-hint">Sem riscos no projecto</p>`;
     return;
   }
+  const obsById = Object.fromEntries(
+    (editingAval?.riscos || []).map((r) => [r.risco_id, r.observacao || ""])
+  );
   host.innerHTML = riscos
     .map(
       (r) => `
@@ -414,7 +461,9 @@ function renderRisks(pilar) {
       </div>
       <label class="risk-obs-field">
         <span>Observacao do periodo</span>
-        <textarea class="risco-obs" rows="3" placeholder="Observacao deste periodo"></textarea>
+        <textarea class="risco-obs" rows="3" placeholder="Observacao deste periodo">${escapeHtml(
+          obsById[r.id] || ""
+        )}</textarea>
       </label>
     </article>`
     )
@@ -449,10 +498,13 @@ function renderForm(pilar) {
               .map((a) => {
                 const cancelled = isActCancelled(a);
                 const prev = prevAct(a.id);
+                const edited = editAct(a.id);
                 const minPct = Number(prev?.pct_conclusao || 0);
-                const startPct = minPct;
+                const startPct = edited != null ? Number(edited.pct_conclusao || 0) : minPct;
                 const prevInicio = prev?.data_inicio_real || "";
                 const prevFim = prev?.data_fim_real || "";
+                const startInicio = edited?.data_inicio_real || "";
+                const startFim = edited?.data_fim_real || "";
                 const iniPrev = fmtDateShort(a.data_inicio_prevista);
                 const fimPrev = fmtDateShort(a.data_fim_prevista);
                 const planned =
@@ -486,8 +538,12 @@ function renderForm(pilar) {
                 <td>
                   <input class="exec-pct" type="number" min="0" max="100" step="1" value="${startPct}" data-min="${minPct}" />
                 </td>
-                <td><input class="exec-inicio" type="text" value="" placeholder="dd/mm/aaaa" /></td>
-                <td><input class="exec-fim" type="text" value="" placeholder="dd/mm/aaaa" /></td>
+                <td><input class="exec-inicio" type="text" value="${escapeHtml(
+                  startInicio
+                )}" placeholder="dd/mm/aaaa" /></td>
+                <td><input class="exec-fim" type="text" value="${escapeHtml(
+                  startFim
+                )}" placeholder="dd/mm/aaaa" /></td>
               </tr>`;
               })
               .join("")}
@@ -525,13 +581,15 @@ function renderForm(pilar) {
     cats
       .map((c) => {
         const prev = prevOrc(c.id);
+        const edited = editOrc(c.id);
         const minVal = Number(prev?.valor_executado || 0);
+        const startVal = edited != null ? Number(edited.valor_executado || 0) : minVal;
         return `
       <tr data-cat-id="${c.id}">
         <td>${escapeHtml(c.categoria)}</td>
         <td class="planned-cell">${fmtMoney(c.valor_alocado)}</td>
         <td>
-          <input class="executed-val" type="number" min="0" step="0.01" value="${minVal}" data-planned="${c.valor_alocado}" data-min="${minVal}" />
+          <input class="executed-val" type="number" min="0" step="0.01" value="${startVal}" data-planned="${c.valor_alocado}" data-min="${minVal}" />
         </td>
         <td class="pct-cell">0%</td>
       </tr>`;
@@ -545,6 +603,7 @@ function renderForm(pilar) {
 
   seedPassos(pilar);
   renderRisks(pilar);
+  setEditChrome(Boolean(editingAvalId));
 
   empty.hidden = true;
   form.hidden = false;
@@ -560,6 +619,7 @@ document.getElementById("btn-add-passo")?.addEventListener("click", () => {
     responsavel: "",
     prazo: "",
     alcancado: false,
+    removivel: true,
   });
   renderPassosFromRows(rows);
 });
@@ -616,7 +676,7 @@ function buildPayload() {
     const passoId = el.dataset.passoId ? Number(el.dataset.passoId) : null;
     const alcancado = Boolean(el.querySelector(".passo-alcancado")?.checked);
     if (!descricao) throw new Error("Indique a descricao de todos os proximos passos.");
-    if (prazo && prazo < todayISO()) {
+    if (!editingAvalId && prazo && prazo < todayISO()) {
       throw new Error("O prazo dos proximos passos deve ser uma data futura (ou hoje).");
     }
     return {
@@ -653,7 +713,7 @@ function buildPayload() {
 async function loadPilar(id) {
   const url = new URL(window.location.href);
   url.searchParams.set("pilar", String(id));
-  window.history.replaceState({}, "", url);
+  const editParam = Number(url.searchParams.get("edit")) || null;
   empty.hidden = false;
   empty.innerHTML = `<i class="bi bi-hourglass-split"></i><p>A carregar projecto...</p>`;
   form.hidden = true;
@@ -662,7 +722,34 @@ async function loadPilar(id) {
       api(`/pilares/${id}`),
       api(`/avaliacoes/latest/${id}`).catch(() => ({ avaliacao: null })),
     ]);
+
+    editingAval = null;
+    editingAvalId = null;
+    if (editParam) {
+      try {
+        const { avaliacao } = await api(`/avaliacoes/${editParam}`);
+        if (avaliacao && Number(avaliacao.pilar_id) === Number(id)) {
+          editingAval = avaliacao;
+          editingAvalId = editParam;
+        } else {
+          url.searchParams.delete("edit");
+          toast("A avaliacao a editar nao pertence a este projecto.", "error");
+        }
+      } catch (err) {
+        url.searchParams.delete("edit");
+        toast(err.message || "Nao foi possivel carregar a avaliacao para edicao.", "error");
+      }
+    } else {
+      url.searchParams.delete("edit");
+    }
+
     previousAval = latest?.avaliacao || null;
+    // Baseline de minimos: avaliacao anterior (nao a que estamos a editar).
+    if (previousAval && editingAval && Number(previousAval.id) === Number(editingAval.id)) {
+      previousAval = null;
+    }
+
+    window.history.replaceState({}, "", url);
     renderForm(pilar);
   } catch (err) {
     toast(err.message || "Erro ao carregar projecto", "error");
@@ -674,14 +761,22 @@ form?.addEventListener("submit", async (e) => {
   e.preventDefault();
   const submitBtn = document.getElementById("btn_submit");
   if (!submitBtn) return;
+  const isEdit = Boolean(editingAvalId);
   submitBtn.disabled = true;
-  submitBtn.innerHTML = '<i class="bi bi-arrow-repeat"></i> A submeter...';
+  submitBtn.innerHTML = isEdit
+    ? '<i class="bi bi-arrow-repeat"></i> A actualizar...'
+    : '<i class="bi bi-arrow-repeat"></i> A submeter...';
   try {
     const payload = buildPayload();
-    const result = await api("/avaliacoes", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
+    const result = isEdit
+      ? await api(`/avaliacoes/${editingAvalId}`, {
+          method: "PATCH",
+          body: JSON.stringify(payload),
+        })
+      : await api("/avaliacoes", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
 
     if (pendingAnexos.length) {
       submitBtn.innerHTML = '<i class="bi bi-arrow-repeat"></i> A carregar anexos...';
@@ -690,7 +785,10 @@ form?.addEventListener("submit", async (e) => {
       await apiForm(`/avaliacoes/${result.id}/anexos`, fd);
     }
 
-    toast(result.message || "Avaliacao submetida.", "success");
+    toast(
+      result.message || (isEdit ? "Avaliacao actualizada." : "Avaliacao submetida."),
+      "success"
+    );
     setTimeout(() => {
       window.location.href = `/avaliacoes?ver=${result.id}`;
     }, 700);
@@ -698,7 +796,7 @@ form?.addEventListener("submit", async (e) => {
     toast(err.message || "Falha ao submeter", "error");
   } finally {
     submitBtn.disabled = false;
-    submitBtn.innerHTML = '<i class="bi bi-send"></i> Submeter avaliacao';
+    setEditChrome(Boolean(editingAvalId));
   }
 });
 

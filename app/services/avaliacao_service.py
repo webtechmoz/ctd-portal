@@ -140,7 +140,7 @@ def create_avaliacao(session: Session, user: User, payload: AvaliacaoCreate) -> 
                 422,
             )
 
-    resolved_passos: list[tuple[int, bool, str | None]] = []
+    resolved_passos: list[tuple[int, bool, str | None, bool]] = []
     next_ordem = len(pilar.proximos_passos)
     for row in payload.proximos_passos:
         if row.passo_id is not None:
@@ -150,7 +150,7 @@ def create_avaliacao(session: Session, user: User, payload: AvaliacaoCreate) -> 
                     f"Passo {row.passo_id} nao pertence ao pilar.",
                     422,
                 )
-            resolved_passos.append((row.passo_id, row.alcancado, row.observacao))
+            resolved_passos.append((row.passo_id, row.alcancado, row.observacao, False))
             continue
         desc = (row.descricao or "").strip()
         if not desc:
@@ -169,7 +169,7 @@ def create_avaliacao(session: Session, user: User, payload: AvaliacaoCreate) -> 
         next_ordem += 1
         session.add(novo)
         session.flush()
-        resolved_passos.append((novo.id, row.alcancado, row.observacao))
+        resolved_passos.append((novo.id, row.alcancado, row.observacao, True))
 
     # Progresso = media das % das actividades activas (canceladas excluidas)
     active_rows = [
@@ -234,13 +234,14 @@ def create_avaliacao(session: Session, user: User, payload: AvaliacaoCreate) -> 
             )
         )
 
-    for passo_id, alcancado, observacao in resolved_passos:
+    for passo_id, alcancado, observacao, criado_nesta in resolved_passos:
         session.add(
             AvaliacaoProximoPasso(
                 avaliacao_id=avaliacao.id,
                 passo_id=passo_id,
                 alcancado=alcancado,
                 observacao=observacao,
+                criado_nesta_avaliacao=criado_nesta,
             )
         )
 
@@ -312,6 +313,12 @@ def update_avaliacao(
                 422,
             )
 
+    old_criado = {
+        p.passo_id: bool(getattr(p, "criado_nesta_avaliacao", False))
+        for p in list(avaliacao.proximos_passos)
+    }
+    old_criado_ids = {pid for pid, flag in old_criado.items() if flag}
+
     for coll in (
         list(avaliacao.actividades),
         list(avaliacao.orcamentos),
@@ -372,17 +379,71 @@ def update_avaliacao(
                 observacao=row.observacao,
             )
         )
+
+    passo_ids = {p.id for p in pilar.proximos_passos}
+    next_ordem = len(pilar.proximos_passos)
+    kept_passo_ids: set[int] = set()
     for row in payload.proximos_passos:
-        if row.passo_id is None:
-            continue
+        passo_id = row.passo_id
+        criado_nesta = False
+        if passo_id is None:
+            desc = (row.descricao or "").strip()
+            if not desc:
+                raise auth_service.AuthError(
+                    "VALIDATION_ERROR",
+                    "Proximos passos novos precisam de descricao.",
+                    422,
+                )
+            novo = PilarProximoPasso(
+                pilar_id=pilar.id,
+                descricao=desc,
+                responsavel=(row.responsavel or "").strip(),
+                prazo=row.prazo,
+                ordem=next_ordem,
+            )
+            next_ordem += 1
+            session.add(novo)
+            session.flush()
+            passo_id = novo.id
+            passo_ids.add(passo_id)
+            criado_nesta = True
+        elif passo_id not in passo_ids:
+            raise auth_service.AuthError(
+                "VALIDATION_ERROR",
+                f"Passo {passo_id} nao pertence ao pilar.",
+                422,
+            )
+        else:
+            criado_nesta = bool(old_criado.get(passo_id, False))
+            master = next((p for p in pilar.proximos_passos if p.id == passo_id), None)
+            if master is not None:
+                if row.descricao is not None and (row.descricao or "").strip():
+                    master.descricao = (row.descricao or "").strip()
+                if row.responsavel is not None:
+                    master.responsavel = (row.responsavel or "").strip()
+                if row.prazo is not None:
+                    master.prazo = row.prazo
+        kept_passo_ids.add(passo_id)
         session.add(
             AvaliacaoProximoPasso(
                 avaliacao_id=avaliacao.id,
-                passo_id=row.passo_id,
+                passo_id=passo_id,
                 alcancado=row.alcancado,
                 observacao=row.observacao,
+                criado_nesta_avaliacao=criado_nesta,
             )
         )
+
+    # Remover do master os passos criados nesta avaliacao e omitidos no PATCH.
+    for pid in old_criado_ids - kept_passo_ids:
+        still_linked = session.scalar(
+            select(AvaliacaoProximoPasso.id).where(AvaliacaoProximoPasso.passo_id == pid).limit(1)
+        )
+        if still_linked:
+            continue
+        master = session.get(PilarProximoPasso, pid)
+        if master is not None:
+            session.delete(master)
 
     session.flush()
     return AvaliacaoCreated(

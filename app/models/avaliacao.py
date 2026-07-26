@@ -164,6 +164,9 @@ class AvaliacaoProximoPasso(Base):
         ForeignKey("pilar_proximos_passos.id", ondelete="RESTRICT"), nullable=False
     )
     alcancado: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    criado_nesta_avaliacao: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
     observacao: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     avaliacao = relationship("Avaliacao", back_populates="proximos_passos")

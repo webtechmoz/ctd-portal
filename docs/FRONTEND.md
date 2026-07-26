@@ -10,8 +10,8 @@ Cada rota HTML e um shell estatico. A logica vive em `js/pages/*.js` (ES modules
 |-----|------|-----|
 | `/` | `frontend/index.html` | `js/pages/home.js` |
 | `/login` | `login.html` | `login.js` |
-| `/avaliacao` | `avaliacao.html` | `avaliacao.js` |
-| `/avaliacoes` | `avaliacoes.html` | `avaliacoes.js` |
+| `/avaliacao` | `avaliacao.html` | `avaliacao.js` — query `pilar`, `edit` (edicao) |
+| `/avaliacoes` | `avaliacoes.html` | `avaliacoes.js` — query `ver` (detalhe) |
 | `/relatorios` | `relatorios.html` | `relatorios.js` |
 | `/anexos` | `anexos.html` | `anexos.js` |
 | `/projectos` | `projectos.html` | `projectos.js` |
@@ -72,6 +72,7 @@ CSS FOUC: `body:not(.app-body) #app > *:not(.boot-loading)` esconde conteudo ate
 - Formularios longos: blocos `.aval-block` / `.form-section`.
 - Tabelas de avaliacao: `.aval-table` a 100% de largura.
 - Selects dentro de overflow: sempre `enhanceSelect` / styled-select (portal fixed).
+- Em `/avaliacao?edit=…`, pre-carregar detalhe via `GET /avaliacoes/{id}` e gravar com `PATCH`; botao apagar nos proximos passos so se `removivel`.
 
 ## Admin
 
