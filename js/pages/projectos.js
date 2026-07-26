@@ -71,8 +71,9 @@ function fmtDate(iso) {
 
 function statusPill(status) {
   const s = String(status || "activo");
-  const cls = s === "inactivo" ? "neutro" : "ok";
-  return `<span class="status-pill ${cls}">${escapeHtml(s)}</span>`;
+  const map = { activo: "ok", concluido: "ok", inactivo: "neutro" };
+  const labels = { activo: "activo", concluido: "concluido", inactivo: "inactivo" };
+  return `<span class="status-pill ${map[s] || "neutro"}">${escapeHtml(labels[s] || s)}</span>`;
 }
 
 function prioridadePill(p) {
@@ -175,9 +176,11 @@ async function showDetail(id) {
               <span class="ficha-meta-dot">${escapeHtml(pilar.area || "—")}</span>
               <span class="ficha-meta-dot">${escapeHtml(pilar.fase || "—")}</span>
               ${
-                pilar.proxima_avaliacao
-                  ? `<span class="ficha-meta-dot">Prox. ${escapeHtml(fmtDate(pilar.proxima_avaliacao))}</span>`
-                  : ""
+                pilar.status === "concluido"
+                  ? `<span class="ficha-meta-dot">Sem avaliacoes pendentes</span>`
+                  : pilar.proxima_avaliacao
+                    ? `<span class="ficha-meta-dot">Prox. ${escapeHtml(fmtDate(pilar.proxima_avaliacao))}</span>`
+                    : ""
               }
             </div>
           </div>
@@ -299,7 +302,11 @@ function renderList() {
           <span>${escapeHtml(p.area || "—")} · ${escapeHtml(p.fase || "—")}</span>
           <div class="card-meta">
             ${statusPill(p.status)}
-            <span class="status-pill neutro">Prox. ${escapeHtml(fmtDate(p.proxima_avaliacao) || "—")}</span>
+            <span class="status-pill neutro">Prox. ${
+              p.status === "concluido"
+                ? "—"
+                : escapeHtml(fmtDate(p.proxima_avaliacao) || "—")
+            }</span>
           </div>
         </div>
         <div class="card-foot"><span>Abrir ficha</span><i class="bi bi-chevron-right"></i></div>

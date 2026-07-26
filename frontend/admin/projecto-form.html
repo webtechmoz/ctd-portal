@@ -43,7 +43,8 @@
             <label class="field"><span>Fase</span><select id="p_fase"></select></label>
             <label class="field"><span>Estado</span>
               <select id="p_status">
-                <option value="activo">activo</option>
+                <option value="activo">activo — exige avaliacoes</option>
+                <option value="concluido">concluido — sem mais avaliacoes</option>
                 <option value="inactivo">inactivo</option>
               </select>
             </label>
@@ -139,6 +140,7 @@
 
         <div class="page-form-actions">
           <div class="modal-foot-danger" id="pilar-danger-actions" hidden>
+            <button type="button" class="btn btn-outline compact" id="btn-complete-pilar"><i class="bi bi-check2-circle"></i> Marcar concluido</button>
             <button type="button" class="btn btn-outline compact" id="btn-deactivate-pilar"><i class="bi bi-pause-circle"></i> Desactivar</button>
             <button type="button" class="btn btn-danger compact" id="btn-delete-pilar"><i class="bi bi-trash"></i> Apagar</button>
           </div>

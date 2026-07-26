@@ -7,7 +7,7 @@ from datetime import date
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from app.models.enums import UserRole
+from app.models.enums import UserRole, PilarStatus
 from app.models.notification import Notification
 from app.models.pilar import Pilar
 from app.models.rbac import Permission, RolePermission
@@ -91,7 +91,10 @@ def sync_due_avaliacoes(session: Session, user: User) -> int:
     created = 0
     pilares = session.scalars(
         select(Pilar)
-        .where(Pilar.proxima_avaliacao.is_not(None))
+        .where(
+            Pilar.proxima_avaliacao.is_not(None),
+            Pilar.status == PilarStatus.activo,
+        )
         .options(selectinload(Pilar.responsaveis))
     ).all()
     for p in pilares:

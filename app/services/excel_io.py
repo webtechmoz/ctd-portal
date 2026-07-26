@@ -280,7 +280,7 @@ def build_import_template(session: Session | None = None) -> bytes:
         help_ws.append(
             [field_map.get(cat, cat), f"Ver Listas filtrado por categoria={cat} ({label})"]
         )
-    help_ws.append(["Projecto.status", "activo | inactivo"])
+    help_ws.append(["Projecto.status", "activo | concluido | inactivo"])
     help_ws.append(["Actividades.prioridade", "alta | media | baixa"])
     help_ws.append(["Actividades.status", "activa | cancelada"])
     help_ws.append(["Riscos.probabilidade", "alta | media | baixa"])
@@ -530,7 +530,7 @@ def import_pilares_from_xlsx(
         try:
             status = PilarStatus(status_raw)
         except ValueError:
-            row_errors.append(f"status «{status_raw}» invalido (activo|inactivo)")
+            row_errors.append(f"status «{status_raw}» invalido (activo|concluido|inactivo)")
             status = PilarStatus.activo
 
         try:

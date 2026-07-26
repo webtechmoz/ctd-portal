@@ -23,6 +23,7 @@ class UserStatus(str, enum.Enum):
 class PilarStatus(str, enum.Enum):
     activo = "activo"
     inactivo = "inactivo"
+    concluido = "concluido"
 
 
 class Prioridade(str, enum.Enum):

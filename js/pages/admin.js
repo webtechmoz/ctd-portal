@@ -702,7 +702,9 @@ function renderPilares() {
             <td><strong>${escapeHtml(p.nome)}</strong></td>
             <td>${escapeHtml(p.area || "—")}</td>
             <td>${escapeHtml(p.fase || "—")}</td>
-            <td><span class="status-pill ${p.status === "activo" ? "ok" : "neutro"}">${escapeHtml(p.status)}</span></td>
+            <td><span class="status-pill ${
+              p.status === "activo" ? "ok" : p.status === "concluido" ? "ok" : "neutro"
+            }">${escapeHtml(p.status)}</span></td>
             <td>${escapeHtml(p.proxima_avaliacao || "—")}</td>
             <td>
               <div class="row-actions">

@@ -9,6 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.avaliacao import Avaliacao, AvaliacaoActividade, AvaliacaoOrcamento, AvaliacaoRisco
+from app.models.enums import PilarStatus
 from app.models.pilar import (
     Pilar,
     PilarActividade,
@@ -326,11 +327,23 @@ def update_pilar(session: Session, pilar_id: int, data: PilarUpdate) -> PilarMas
             raise auth_service.AuthError("CONFLICT", "Ja existe um projecto com este nome.", 409)
 
     period_changed = "periodicidade_dias" in fields
+    status_changed = "status" in fields
     for key, value in fields.items():
         setattr(pilar, key, value)
 
+    if status_changed:
+        st = pilar.status.value if hasattr(pilar.status, "value") else str(pilar.status)
+        if st in (PilarStatus.concluido.value, PilarStatus.inactivo.value):
+            # Para de exigir avaliacoes
+            pilar.proxima_avaliacao = None
+            pilar.prazo_limite = None
+        elif st == PilarStatus.activo.value and not pilar.proxima_avaliacao:
+            pilar.proxima_avaliacao = _calc_proxima(pilar.periodicidade_dias)
+
     if period_changed and "proxima_avaliacao" not in fields:
-        pilar.proxima_avaliacao = _calc_proxima(pilar.periodicidade_dias)
+        st = pilar.status.value if hasattr(pilar.status, "value") else str(pilar.status)
+        if st == PilarStatus.activo.value:
+            pilar.proxima_avaliacao = _calc_proxima(pilar.periodicidade_dias)
 
     _apply_deletes(session, pilar, data)
     session.flush()

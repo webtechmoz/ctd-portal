@@ -486,10 +486,19 @@ function fillForm(pilar) {
   const danger = document.getElementById("pilar-danger-actions");
   if (danger) {
     danger.hidden = !pilar?.id;
+    const completeBtn = document.getElementById("btn-complete-pilar");
     const deactBtn = document.getElementById("btn-deactivate-pilar");
     const delBtn = document.getElementById("btn-delete-pilar");
+    if (completeBtn) {
+      completeBtn.hidden = !canDeactivate();
+      const done = pilar?.status === "concluido";
+      completeBtn.innerHTML = done
+        ? `<i class="bi bi-arrow-counterclockwise"></i> Reabrir projecto`
+        : `<i class="bi bi-check2-circle"></i> Marcar concluido`;
+      completeBtn.dataset.nextStatus = done ? "activo" : "concluido";
+    }
     if (deactBtn) {
-      deactBtn.hidden = !canDeactivate();
+      deactBtn.hidden = !canDeactivate() || pilar?.status === "concluido";
       const inactive = pilar?.status === "inactivo";
       deactBtn.innerHTML = inactive
         ? `<i class="bi bi-play-circle"></i> Activar`
@@ -503,6 +512,27 @@ function fillForm(pilar) {
 }
 
 document.getElementById("p_period")?.addEventListener("change", syncProximaFromPeriod);
+
+document.getElementById("btn-complete-pilar")?.addEventListener("click", async () => {
+  const editId = document.getElementById("p_edit_id").value;
+  if (!editId || !canDeactivate()) return;
+  const next = document.getElementById("btn-complete-pilar").dataset.nextStatus || "concluido";
+  const msg =
+    next === "concluido"
+      ? "Marcar este projecto como concluido? Deixa de exigir avaliacoes periodicas."
+      : "Reabrir este projecto (volta a activo e a exigir avaliacoes)?";
+  if (!confirm(msg)) return;
+  try {
+    await api(`/pilares/${editId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status: next }),
+    });
+    toast(next === "concluido" ? "Projecto marcado como concluido." : "Projecto reaberto.", "success");
+    window.location.href = LIST_URL;
+  } catch (err) {
+    toast(err.message || "Erro", "error");
+  }
+});
 
 document.getElementById("btn-deactivate-pilar")?.addEventListener("click", async () => {
   const editId = document.getElementById("p_edit_id").value;

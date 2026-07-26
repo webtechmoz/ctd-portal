@@ -89,6 +89,15 @@ function prevOrc(catId) {
   return (previousAval?.orcamentos || []).find((o) => o.categoria_id === catId) || null;
 }
 
+function setDateInput(el, iso) {
+  if (!el) return;
+  el.value = iso || "";
+  if (el._flatpickr) {
+    if (iso) el._flatpickr.setDate(iso, false);
+    else el._flatpickr.clear();
+  }
+}
+
 function applyActivityDerived(row) {
   const pctInput = row.querySelector(".exec-pct");
   let pct = Number(pctInput.value);
@@ -109,19 +118,35 @@ function applyActivityDerived(row) {
   const prevFim = row.dataset.prevFim || "";
 
   if (pct <= 0) {
-    inicioEl.value = "";
-    fimEl.value = "";
+    setDateInput(inicioEl, "");
+    setDateInput(fimEl, "");
+    delete row.dataset.startedAt;
+    delete row.dataset.finishedAt;
+    return;
+  }
+
+  // Sugere datas so se o campo estiver vazio — o utilizador pode ajustar livremente.
+  if (!inicioEl.value) {
+    const suggested = prevInicio || row.dataset.startedAt || todayISO();
+    setDateInput(inicioEl, suggested);
+    row.dataset.startedAt = suggested;
   } else {
-    inicioEl.value = prevInicio || row.dataset.startedAt || todayISO();
-    if (!row.dataset.startedAt && !prevInicio) row.dataset.startedAt = inicioEl.value;
-    if (pct >= 100) {
+    row.dataset.startedAt = inicioEl.value;
+  }
+
+  if (pct >= 100) {
+    if (!fimEl.value) {
       const prevDone = Number(prevAct(Number(row.dataset.actId))?.pct_conclusao || 0) >= 100;
-      fimEl.value = prevDone && prevFim ? prevFim : row.dataset.finishedAt || todayISO();
-      if (!row.dataset.finishedAt) row.dataset.finishedAt = fimEl.value;
+      const suggested = prevDone && prevFim ? prevFim : row.dataset.finishedAt || todayISO();
+      setDateInput(fimEl, suggested);
+      row.dataset.finishedAt = suggested;
     } else {
-      fimEl.value = "";
-      delete row.dataset.finishedAt;
+      row.dataset.finishedAt = fimEl.value;
     }
+  } else {
+    // Em progresso: sem data de fim (mas inicio permanece editavel)
+    setDateInput(fimEl, "");
+    delete row.dataset.finishedAt;
   }
 }
 
@@ -461,8 +486,8 @@ function renderForm(pilar) {
                 <td>
                   <input class="exec-pct" type="number" min="0" max="100" step="1" value="${startPct}" data-min="${minPct}" />
                 </td>
-                <td><input class="exec-inicio" type="text" readonly value="" placeholder="—" /></td>
-                <td><input class="exec-fim" type="text" readonly value="" placeholder="—" /></td>
+                <td><input class="exec-inicio" type="text" value="" placeholder="dd/mm/aaaa" /></td>
+                <td><input class="exec-fim" type="text" value="" placeholder="dd/mm/aaaa" /></td>
               </tr>`;
               })
               .join("")}
@@ -471,6 +496,20 @@ function renderForm(pilar) {
       </div>`;
 
     exec.querySelectorAll(".exec-row:not(.is-cancelled)").forEach((row) => {
+      const inicioEl = row.querySelector(".exec-inicio");
+      const fimEl = row.querySelector(".exec-fim");
+      bindDatePicker(inicioEl, {
+        onChange(iso) {
+          if (iso) row.dataset.startedAt = iso;
+          else delete row.dataset.startedAt;
+        },
+      });
+      bindDatePicker(fimEl, {
+        onChange(iso) {
+          if (iso) row.dataset.finishedAt = iso;
+          else delete row.dataset.finishedAt;
+        },
+      });
       applyActivityDerived(row);
       row.querySelector(".exec-pct")?.addEventListener("input", () => {
         applyActivityDerived(row);

@@ -15,7 +15,14 @@ from app.models.avaliacao import (
     AvaliacaoProximoPasso,
     AvaliacaoRisco,
 )
-from app.models.enums import ActividadeEstado, ActividadeStatus, AvaliacaoStatus, UserRole, utcnow
+from app.models.enums import (
+    ActividadeEstado,
+    ActividadeStatus,
+    AvaliacaoStatus,
+    PilarStatus,
+    UserRole,
+    utcnow,
+)
 from app.models.pilar import Pilar, PilarProximoPasso, PilarResponsavel
 from app.models.user import User
 from app.repositories import avaliacoes as aval_repo
@@ -52,6 +59,15 @@ def create_avaliacao(session: Session, user: User, payload: AvaliacaoCreate) -> 
     pilar = pilar_repo.get_with_master(session, payload.pilar_id)
     if not pilar:
         raise auth_service.AuthError("NOT_FOUND", "Pilar nao encontrado.", 404)
+
+    st = pilar.status.value if hasattr(pilar.status, "value") else str(pilar.status)
+    if st != PilarStatus.activo.value:
+        raise auth_service.AuthError(
+            "CONFLICT",
+            "So e possivel submeter avaliacoes em projectos activos "
+            f"(estado actual: {st}).",
+            409,
+        )
 
     if not user_can_evaluate(session, user, pilar.id):
         raise auth_service.AuthError(
@@ -423,6 +439,9 @@ def reopen_avaliacao(
 
 
 def _update_schedule(pilar: Pilar, data_sub: date) -> None:
+    st = pilar.status.value if hasattr(pilar.status, "value") else str(pilar.status)
+    if st != "activo":
+        return
     days = pilar.periodicidade_dias or 90
     open_days = pilar.dias_aberto or 7
     next_date = data_sub + timedelta(days=days)
