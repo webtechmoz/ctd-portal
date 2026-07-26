@@ -20,7 +20,7 @@ def upgrade() -> None:
         sa.Column("titulo", sa.String(length=200), nullable=False),
         sa.Column("corpo", sa.Text(), nullable=False),
         sa.Column("link", sa.String(length=500), nullable=True),
-        sa.Column("lida", sa.Boolean(), nullable=False, server_default=sa.text("0")),
+        sa.Column("lida", sa.Boolean(), nullable=False, server_default=sa.false()),
         sa.Column("ref_type", sa.String(length=40), nullable=True),
         sa.Column("ref_id", sa.Integer(), nullable=True),
         sa.Column("dedupe_key", sa.String(length=120), nullable=True),
