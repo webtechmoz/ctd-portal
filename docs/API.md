@@ -118,6 +118,23 @@ Cada item inclui `source_label`, `source_url` (ex. `/avaliacoes?ver=…`), autor
 
 ---
 
+## Notificacoes
+
+| Metodo | Path | Notas |
+|--------|------|-------|
+| GET | `/notifications` | lista + sync; badge `unread` |
+| POST | `/notifications/{id}/read` | marcar uma como lida |
+| POST | `/notifications/read-all` | marcar todas |
+
+No `GET`, o servidor sincroniza:
+
+- avaliacoes devidas/atrasadas (responsaveis e validadores)
+- avaliacoes **nao validadas** (`submetida` / `reaberta`) para quem tem `avaliacao.validate` (ou admin)
+
+Ao submeter/actualizar/reabrir uma avaliacao, os validadores recebem `avaliacao_pendente_validacao`. Ao validar, essas notificacoes passam a lidas.
+
+---
+
 ## Dashboard / relatorios
 
 | Metodo | Path | Notas |

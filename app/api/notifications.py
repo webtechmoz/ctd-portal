@@ -16,6 +16,7 @@ def register(app):
             with session_scope() as session:
                 ctx = require_auth(app, session)
                 notif_svc.sync_due_avaliacoes(session, ctx.user)
+                notif_svc.sync_pending_validations(session, ctx.user)
                 rows = notif_svc.list_for_user(session, ctx.user.id)
                 unread = notif_svc.count_unread(session, ctx.user.id)
                 return api_json(

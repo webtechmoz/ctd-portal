@@ -7,7 +7,8 @@ from datetime import date
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from app.models.enums import UserRole, PilarStatus
+from app.models.avaliacao import Avaliacao
+from app.models.enums import AvaliacaoStatus, PilarStatus, UserRole, UserStatus
 from app.models.notification import Notification
 from app.models.pilar import Pilar
 from app.models.rbac import Permission, RolePermission
@@ -16,10 +17,19 @@ from app.services.email_service import send_simple_notice
 from app.services.rbac_service import user_has_permission
 from config.settings import settings
 
+TIPO_PENDENTE_VALIDACAO = "avaliacao_pendente_validacao"
+
 
 def _login_base() -> str:
     origins = [o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()]
     return (origins[0] if origins else f"http://localhost:{settings.bind_port}").rstrip("/")
+
+
+def _is_validator(session: Session, user: User) -> bool:
+    role_val = user.role.value if hasattr(user.role, "value") else str(user.role)
+    if role_val == UserRole.admin.value:
+        return True
+    return user_has_permission(session, user, "avaliacao.validate")
 
 
 def notify(
@@ -71,7 +81,9 @@ def notify(
 
 def _validator_user_ids(session: Session) -> set[int]:
     ids: set[int] = set()
-    admins = session.scalars(select(User).where(User.role == UserRole.admin)).all()
+    admins = session.scalars(
+        select(User).where(User.role == UserRole.admin, User.status == UserStatus.active)
+    ).all()
     ids.update(u.id for u in admins)
     perm = session.scalar(select(Permission).where(Permission.code == "avaliacao.validate"))
     if perm:
@@ -79,9 +91,132 @@ def _validator_user_ids(session: Session) -> set[int]:
             select(RolePermission.role_id).where(RolePermission.permission_id == perm.id)
         ).all()
         if role_ids:
-            users = session.scalars(select(User).where(User.role_id.in_(list(role_ids)))).all()
+            users = session.scalars(
+                select(User).where(
+                    User.role_id.in_(list(role_ids)),
+                    User.status == UserStatus.active,
+                )
+            ).all()
             ids.update(u.id for u in users)
     return ids
+
+
+def _pending_validation_copy(avaliacao: Avaliacao) -> tuple[str, str]:
+    pilar_nome = avaliacao.pilar.nome if avaliacao.pilar else f"#{avaliacao.pilar_id}"
+    autor = avaliacao.user.name if avaliacao.user else "—"
+    data = avaliacao.data_sub.isoformat() if avaliacao.data_sub else "—"
+    st = (
+        avaliacao.status.value
+        if hasattr(avaliacao.status, "value")
+        else str(avaliacao.status or "submetida")
+    )
+    titulo = f"Avaliacao por validar: {pilar_nome}"
+    corpo = f"Submetida por {autor} em {data} (#{avaliacao.id}, {st})."
+    return titulo, corpo
+
+
+def notify_pending_validation(session: Session, avaliacao: Avaliacao) -> None:
+    """Cria/reactiva notificacao in-app (+ email) para todos os validadores."""
+    if avaliacao.pilar is None or avaliacao.user is None:
+        session.refresh(avaliacao, attribute_names=["pilar", "user"])
+    titulo, corpo = _pending_validation_copy(avaliacao)
+    link = f"/avaliacoes?ver={avaliacao.id}"
+    for uid in _validator_user_ids(session):
+        existing = session.scalar(
+            select(Notification).where(
+                Notification.user_id == uid,
+                Notification.tipo == TIPO_PENDENTE_VALIDACAO,
+                Notification.ref_type == "avaliacao",
+                Notification.ref_id == avaliacao.id,
+                Notification.dedupe_key == str(avaliacao.id),
+            )
+        )
+        if existing:
+            existing.titulo = titulo
+            existing.corpo = corpo
+            existing.link = link
+            existing.lida = False
+            continue
+        notify(
+            session,
+            user_id=uid,
+            tipo=TIPO_PENDENTE_VALIDACAO,
+            titulo=titulo,
+            corpo=corpo,
+            link=link,
+            ref_type="avaliacao",
+            ref_id=avaliacao.id,
+            dedupe_key=str(avaliacao.id),
+            email=(uid != avaliacao.user_id),
+        )
+
+
+def sync_pending_validations(session: Session, user: User) -> int:
+    """Garante que o validador ve todas as avaliacoes ainda nao validadas."""
+    if not _is_validator(session, user):
+        return 0
+
+    pending = session.scalars(
+        select(Avaliacao)
+        .where(
+            Avaliacao.status.in_(
+                [AvaliacaoStatus.submetida, AvaliacaoStatus.reaberta]
+            )
+        )
+        .options(selectinload(Avaliacao.pilar), selectinload(Avaliacao.user))
+        .order_by(Avaliacao.id.desc())
+    ).all()
+
+    created = 0
+    for aval in pending:
+        titulo, corpo = _pending_validation_copy(aval)
+        existing = session.scalar(
+            select(Notification).where(
+                Notification.user_id == user.id,
+                Notification.tipo == TIPO_PENDENTE_VALIDACAO,
+                Notification.ref_type == "avaliacao",
+                Notification.ref_id == aval.id,
+                Notification.dedupe_key == str(aval.id),
+            )
+        )
+        if existing:
+            existing.titulo = titulo
+            existing.corpo = corpo
+            existing.link = f"/avaliacoes?ver={aval.id}"
+            if existing.lida:
+                existing.lida = False
+            continue
+
+        notify(
+            session,
+            user_id=user.id,
+            tipo=TIPO_PENDENTE_VALIDACAO,
+            titulo=titulo,
+            corpo=corpo,
+            link=f"/avaliacoes?ver={aval.id}",
+            ref_type="avaliacao",
+            ref_id=aval.id,
+            dedupe_key=str(aval.id),
+            email=False,
+        )
+        created += 1
+    return created
+
+
+def clear_pending_validation_notifications(session: Session, avaliacao_id: int) -> int:
+    """Marca como lidas as notificacoes de validacao desta avaliacao."""
+    rows = session.scalars(
+        select(Notification).where(
+            Notification.tipo == TIPO_PENDENTE_VALIDACAO,
+            Notification.ref_type == "avaliacao",
+            Notification.ref_id == avaliacao_id,
+            Notification.lida.is_(False),
+        )
+    ).all()
+    for row in rows:
+        row.lida = True
+    session.flush()
+    return len(rows)
 
 
 def sync_due_avaliacoes(session: Session, user: User) -> int:
@@ -114,22 +249,8 @@ def sync_due_avaliacoes(session: Session, user: User) -> int:
             titulo = f"Avaliacao em {days} dia(s): {p.nome}"
             corpo = f"A proxima avaliacao de «{p.nome}» e em {p.proxima_avaliacao}."
 
-        recipients = set()
-        for link in p.responsaveis:
-            recipients.add(link.user_id)
-        if user_has_permission(session, user, "avaliacao.validate") or (
-            user.role.value if hasattr(user.role, "value") else str(user.role)
-        ) == UserRole.admin.value:
-            recipients.add(user.id)
-        for uid in recipients:
-            if uid != user.id and uid not in {user.id}:
-                # only sync for current user inbox to avoid mass-create on every poll
-                pass
-        # Only ensure notifications for the requesting user
         is_resp = any(l.user_id == user.id for l in p.responsaveis)
-        is_val = user_has_permission(session, user, "avaliacao.validate") or (
-            (user.role.value if hasattr(user.role, "value") else str(user.role)) == UserRole.admin.value
-        )
+        is_val = _is_validator(session, user)
         if not (is_resp or is_val):
             continue
         before = session.scalar(
@@ -157,24 +278,6 @@ def sync_due_avaliacoes(session: Session, user: User) -> int:
         )
         created += 1
     return created
-
-
-def notify_pending_validation(session: Session, avaliacao) -> None:
-    for uid in _validator_user_ids(session):
-        if uid == avaliacao.user_id:
-            continue
-        notify(
-            session,
-            user_id=uid,
-            tipo="avaliacao_pendente_validacao",
-            titulo="Avaliacao pendente de validacao",
-            corpo=f"Nova avaliacao submetida (#{avaliacao.id}).",
-            link=f"/avaliacoes?ver={avaliacao.id}",
-            ref_type="avaliacao",
-            ref_id=avaliacao.id,
-            dedupe_key=str(avaliacao.id),
-            email=True,
-        )
 
 
 def list_for_user(session: Session, user_id: int, *, limit: int = 40) -> list[Notification]:

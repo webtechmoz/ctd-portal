@@ -446,6 +446,12 @@ def update_avaliacao(
             session.delete(master)
 
     session.flush()
+    try:
+        from app.services.notification_service import notify_pending_validation
+
+        notify_pending_validation(session, avaliacao)
+    except Exception:
+        pass
     return AvaliacaoCreated(
         id=avaliacao.id,
         pilar_id=avaliacao.pilar_id,
@@ -475,6 +481,12 @@ def validate_avaliacao(
     if note is not None:
         avaliacao.validation_note = note
     session.flush()
+    try:
+        from app.services.notification_service import clear_pending_validation_notifications
+
+        clear_pending_validation_notifications(session, avaliacao.id)
+    except Exception:
+        pass
     return avaliacao
 
 
@@ -496,6 +508,12 @@ def reopen_avaliacao(
     if note is not None:
         avaliacao.validation_note = note
     session.flush()
+    try:
+        from app.services.notification_service import notify_pending_validation
+
+        notify_pending_validation(session, avaliacao)
+    except Exception:
+        pass
     return avaliacao
 
 

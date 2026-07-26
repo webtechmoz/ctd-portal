@@ -475,7 +475,7 @@ textarea {
   box-shadow: var(--shadow);
   margin-bottom: 20px;
   position: relative;
-  z-index: 60;
+  z-index: 40;
   overflow: visible;
 }
 
@@ -2093,7 +2093,7 @@ body > .styled-select-menu {
   border-bottom: 1px solid rgba(200, 221, 196, 0.7);
   position: sticky;
   top: 0;
-  z-index: 20;
+  z-index: 120;
 }
 
 .shell-titles {
@@ -2126,6 +2126,7 @@ body > .styled-select-menu {
 
 .notif-wrap {
   position: relative;
+  z-index: 2;
 }
 
 .notif-badge {
@@ -2159,7 +2160,7 @@ body > .styled-select-menu {
   box-shadow:
     0 4px 12px rgba(20, 40, 20, 0.06),
     0 24px 48px rgba(20, 40, 20, 0.14);
-  z-index: 80;
+  z-index: 130;
   overflow: hidden;
   animation: notif-pop 0.16s ease-out;
 }
